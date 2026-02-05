@@ -35,7 +35,7 @@ def mock_timestamp():
 @pytest.fixture
 def expected_endpoints():
     """Fixture to provide expected list of endpoints."""
-    return [ep.HELLO_EP, ep.ENDPOINT_EP, ep.TIMESTAMP_EP, ep.RANDOM_EP, ep.DICE_EP]
+    return [ep.HELLO_EP, ep.ENDPOINT_EP, ep.TIMESTAMP_EP]
 
 
 def test_hello():
@@ -90,37 +90,6 @@ def test_timestamp_with_patch(mock_datetime, client):
     assert data['unix'] == mock_now.timestamp()
 
 
-# PATCH: Mock random for random endpoint
-@patch('server.endpoints.random.randint')
-def test_random_with_patch(mock_randint, client):
-    """Test random endpoint with mocked random.randint using patch."""
-    mock_randint.return_value = 42
-    
-    resp = client.get(ep.RANDOM_EP)
-    data = resp.get_json()
-    
-    assert resp.status_code == OK
-    assert data[ep.RANDOM_RESP] == 42
-    assert data['min'] == 1
-    assert data['max'] == 100
-
-
-# PATCH: Mock random for dice endpoint
-@patch('server.endpoints.random.randint')
-def test_dice_with_patch(mock_randint, client):
-    """Test dice endpoint with mocked random using patch."""
-    mock_randint.side_effect = [3, 5]  # Two dice rolls
-    
-    resp = client.get(ep.DICE_EP)
-    data = resp.get_json()
-    
-    assert resp.status_code == OK
-    assert data[ep.DICE_RESP] == [3, 5]
-    assert data['total'] == 8
-    assert data['num_dice'] == 2
-    assert data['sides'] == 6
-
-
 # PYTEST.RAISES: Test invalid endpoint
 def test_invalid_endpoint_raises_404(client):
     """Test that accessing invalid endpoint returns 404 using pytest.raises."""
@@ -143,48 +112,12 @@ def test_timestamp_has_required_fields(client):
     assert 'unix' in data
 
 
-# PYTEST.RAISES: Test dice values are in valid range
-def test_dice_values_in_range(client):
-    """Test that dice rolls are within valid range."""
-    for _ in range(10):  # Test multiple rolls
-        resp = client.get(ep.DICE_EP)
-        data = resp.get_json()
-        
-        for roll in data[ep.DICE_RESP]:
-            assert 1 <= roll <= 6, f"Dice roll {roll} out of range"
-        
-        # Test that invalid assertion would raise
-        with pytest.raises(AssertionError):
-            assert roll > 10  # This should fail
-
-
-# SKIP: Skip this test for future implementation
-@pytest.mark.skip(reason="Feature not yet implemented - waiting for POST support")
-def test_custom_dice_rolls(client):
-    """Test custom number of dice (future feature)."""
-    resp = client.post(ep.DICE_EP, json={'num_dice': 3, 'sides': 20})
-    data = resp.get_json()
-    assert len(data[ep.DICE_RESP]) == 3
-
-
 # SKIP: Conditional skip based on environment
 @pytest.mark.skip(reason="Integration test - requires external service")
 def test_timestamp_matches_external_service(client):
     """Test that our timestamp matches an external time service."""
     # This would require network access in real scenario
     pass
-
-
-# Test random endpoint returns values in range
-def test_random_number_in_range(client):
-    """Test that random endpoint returns values in expected range."""
-    for _ in range(20):  # Test multiple calls
-        resp = client.get(ep.RANDOM_EP)
-        data = resp.get_json()
-        
-        assert resp.status_code == OK
-        random_num = data[ep.RANDOM_RESP]
-        assert 1 <= random_num <= 100
 
 
 # Test timestamp endpoint returns current time

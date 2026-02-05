@@ -7,7 +7,6 @@ The endpoint called `endpoints` will return all available endpoints.
 from flask import Flask, request
 from flask_restx import Resource, Api, fields
 from flask_cors import CORS
-import random
 from datetime import datetime
 from data import db_connect as dbc
 import cities.queries as cq
@@ -42,10 +41,6 @@ HELLO_RESP = 'hello'
 MESSAGE = 'Message'
 TIMESTAMP_EP = '/timestamp'
 TIMESTAMP_RESP = 'timestamp'
-RANDOM_EP = '/random'
-RANDOM_RESP = 'random_number'
-DICE_EP = '/dice'
-DICE_RESP = 'rolls'
 HEALTH_EP = '/health'
 HEALTH_RESP = 'status'
 CITIES_EP = '/cities'
@@ -184,101 +179,6 @@ class Timestamp(Resource):
         return {
             TIMESTAMP_RESP: current_time,
             'unix': datetime.now().timestamp()
-        }
-
-
-@api.route(RANDOM_EP)
-class RandomNumber(Resource):
-    """
-    This class generates and returns random numbers.
-    """
-
-    @api.doc('get_random_number')
-    @api.doc(params={
-        'min': 'Minimum value (optional, default: 1)',
-        'max': 'Maximum value (optional, default: 100)'
-    })
-    @api.response(200, 'Success - Random number generated')
-    def get(self):
-        """
-        Generate a random number.
-
-        Returns a random integer between the specified min and max values.
-        Default range is 1-100 if no parameters provided.
-        """
-        min_val = int(request.args.get('min', 1))
-        max_val = int(request.args.get('max', 100))
-        return {
-            RANDOM_RESP: random.randint(min_val, max_val),
-            'min': min_val,
-            'max': max_val
-        }
-
-
-@api.route(DICE_EP)
-class DiceRoller(Resource):
-    """
-    This class simulates rolling dice.
-    """
-
-    @api.doc('roll_default_dice')
-    @api.response(200, 'Success - Dice rolled')
-    def get(self):
-        """
-        Roll two six-sided dice.
-
-        Simulates rolling 2 six-sided dice and returns individual rolls,
-        total sum, and dice configuration.
-        """
-        num_dice = 2
-        sides = 6
-        rolls = [random.randint(1, sides) for _ in range(num_dice)]
-        return {
-            DICE_RESP: rolls,
-            'total': sum(rolls),
-            'num_dice': num_dice,
-            'sides': sides
-        }
-
-    @api.doc('roll_custom_dice')
-    @api.expect(api.model('DiceConfig', {
-        'num_dice': fields.Integer(required=True,
-                                   description='Number of dice (1-100)',
-                                   example=3),
-        'sides': fields.Integer(required=True,
-                                description='Number of sides per die (2-1000)',
-                                example=20)
-    }))
-    @api.response(200, 'Success - Custom dice rolled')
-    @api.response(400, 'Invalid dice configuration')
-    def post(self):
-        """
-        Roll custom dice configuration.
-
-        Accepts JSON with num_dice and sides to simulate rolling
-        custom dice (e.g., D20, D12, multiple dice).
-        Constraints: 1 <= num_dice <= 100, 2 <= sides <= 1000
-        """
-        data = request.get_json(silent=True) or {}
-        num_dice = data.get('num_dice', 2)
-        sides = data.get('sides', 6)
-        try:
-            num_dice = int(num_dice)
-            sides = int(sides)
-        except Exception as e:  # noqa: BLE001
-            return {'error': f'invalid parameters: {e}'}, 400
-
-        if not (1 <= num_dice <= 100):
-            return {'error': 'num_dice must be between 1 and 100'}, 400
-        if not (2 <= sides <= 1000):
-            return {'error': 'sides must be between 2 and 1000'}, 400
-
-        rolls = [random.randint(1, sides) for _ in range(num_dice)]
-        return {
-            DICE_RESP: rolls,
-            'total': sum(rolls),
-            'num_dice': num_dice,
-            'sides': sides
         }
 
 
