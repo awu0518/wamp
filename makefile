@@ -11,6 +11,7 @@ REQ_DIR = .
 CITIES_DIR = cities
 COUNTRIES_DIR = countries
 STATES_DIR = states
+USERS_DIR = users
 
 FORCE:
 
@@ -26,6 +27,7 @@ all_tests: FORCE
 	cd $(CITIES_DIR); make tests
 	cd $(COUNTRIES_DIR); make tests
 	cd $(STATES_DIR); make tests
+	cd $(USERS_DIR); make tests
 	# cd $(DB_DIR); make tests
 
 dev_env: FORCE
