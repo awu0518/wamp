@@ -30,7 +30,9 @@ def validate_required_fields(data: dict, required_fields: list) -> None:
     for field in required_fields:
         if field not in data:
             missing.append(field)
-        elif data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
+        elif (data[field] is None or
+              (isinstance(data[field], str) and
+               not data[field].strip())):
             empty.append(field)
 
     if missing:
@@ -40,7 +42,8 @@ def validate_required_fields(data: dict, required_fields: list) -> None:
 
 
 def validate_string_length(value: str, field_name: str,
-                          min_length: int = 0, max_length: int = 100) -> None:
+                           min_length: int = 0,
+                           max_length: int = 100) -> None:
     """
     Validate string length.
 
@@ -88,7 +91,7 @@ def validate_exact_length(value: str, field_name: str, length: int) -> None:
 
 
 def validate_pattern(value: str, field_name: str, pattern: str,
-                    description: str = "valid format") -> None:
+                     description: str = "valid format") -> None:
     """
     Validate string against regex pattern.
 
@@ -111,7 +114,7 @@ def validate_pattern(value: str, field_name: str, pattern: str,
 
 
 def validate_alphanumeric(value: str, field_name: str,
-                         allow_spaces: bool = False) -> None:
+                          allow_spaces: bool = False) -> None:
     """
     Validate that string contains only alphanumeric characters.
 
@@ -134,7 +137,7 @@ def validate_alphanumeric(value: str, field_name: str,
 
 
 def validate_alpha(value: str, field_name: str,
-                  allow_spaces: bool = True) -> None:
+                   allow_spaces: bool = True) -> None:
     """
     Validate that string contains only alphabetic characters.
 
@@ -175,7 +178,7 @@ def validate_uppercase(value: str, field_name: str) -> None:
 
 
 def validate_enum(value: Any, field_name: str,
-                 allowed_values: List[Any]) -> None:
+                  allowed_values: List[Any]) -> None:
     """
     Validate that value is in allowed set.
 
@@ -188,14 +191,15 @@ def validate_enum(value: Any, field_name: str,
         ValidationError: If value not in allowed set
     """
     if value not in allowed_values:
+        allowed_str = ', '.join(map(str, allowed_values))
         raise ValidationError(
-            f"{field_name} must be one of: {', '.join(map(str, allowed_values))}"
+            f"{field_name} must be one of: {allowed_str}"
         )
 
 
 def validate_integer(value: Any, field_name: str,
-                    min_value: Optional[int] = None,
-                    max_value: Optional[int] = None) -> None:
+                     min_value: Optional[int] = None,
+                     max_value: Optional[int] = None) -> None:
     """
     Validate integer value and range.
 
