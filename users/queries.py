@@ -2,9 +2,9 @@
 This file deals with user account data and operations.
 All user interactions with MongoDB should be through this file.
 """
-from typing import Optional
-import data.db_connect as dbc
-import validation
+# from typing import Optional
+# import data.db_connect as dbc
+# import validation
 
 USERS_COLLECTION = 'users'
 
@@ -21,4 +21,3 @@ SAMPLE_USER = {
     USERNAME: 'john_doe',
     PASSWORD: 'hashed_password_here',
 }
-
