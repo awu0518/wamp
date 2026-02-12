@@ -101,12 +101,6 @@ Basic page with information about the application.
 
 **How:** Create a simple about page explaining what the app does.
 
-#### 9. Role-Based Access
-Different user types with different permissions.
-
-**Requirement:** Advanced authorization
-
-**How:** New users get "author" role and can only edit their own entries. Editors can view all users. Managing editors can modify any entry.
-
 ### Technical Stack
+
 React, Leaflet or Mapbox, React Testing Library, Vercel, connects to existing Flask backend
