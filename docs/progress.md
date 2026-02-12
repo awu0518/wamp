@@ -8,7 +8,7 @@ We built a backend API server for geographic data using Flask and MongoDB.
 ### What We Built
 
 #### REST API with Full CRUD Operations
-- Created about 12 endpoints for managing cities, states, and countries
+- Created about 15 endpoints for managing cities, states, and countries
 - Implemented get, create, update, and delete operations for all geographic data
 - Added caching for better performance on eligible endpoints
 - Built authentication and role-based access control for security
@@ -104,4 +104,5 @@ Basic page with information about the application.
 ### Technical Stack
 
 React, Leaflet or Mapbox, React Testing Library, Vercel, connects to existing Flask backend
+
 
