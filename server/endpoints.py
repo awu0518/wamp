@@ -9,6 +9,8 @@ from flask_restx import Resource, Api, fields
 from flask_cors import CORS
 from datetime import datetime
 from data import db_connect as dbc
+import users.auth as auth
+import users.queries as uq
 import cities.queries as cq
 import countries.queries as ctq
 import states.queries as stq
@@ -963,6 +965,68 @@ class StatesBulk(Resource):
             return result, 200 if result['failed'] == 0 else 207
         except Exception as e:
             return {'error': str(e)}, 500
+
+
+@api.route('/register')
+class Register(Resource):
+    def post(self):
+        try:
+            data = request.json
+
+            email = data.get("email")
+            username = data.get("username")
+            password = data.get("password")
+
+            # Validate
+            valid, msg = uq.validate_email(email)
+            if not valid:
+                return {"error": msg}, 400
+
+            valid, msg = uq.validate_username(username)
+            if not valid:
+                return {"error": msg}, 400
+
+            valid, msg = uq.validate_password(password)
+            if not valid:
+                return {"error": msg}, 400
+
+            password_hash = auth.hash_password(password)
+
+            user = uq.create_user(email, username, password_hash)
+
+            return {
+                "message": "User created successfully",
+                "user_id": user[uq.ID]
+            }, 201
+
+        except ValueError as e:
+            return {"error": str(e)}, 400
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+
+@api.route('/login')
+class Login(Resource):
+    def post(self):
+        try:
+            data = request.json
+            email = data.get("email")
+            password = data.get("password")
+
+            result = auth.authenticate_user(email, password)
+
+            if not result:
+                return {"error": "Invalid credentials"}, 401
+
+            token, user_data = result
+
+            return {
+                "token": token,
+                "user": user_data
+            }
+
+        except Exception as e:
+            return {"error": str(e)}, 500
 
 
 if __name__ == '__main__':
