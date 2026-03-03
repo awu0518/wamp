@@ -4,6 +4,8 @@ The endpoint called `endpoints` will return all available endpoints.
 """
 # from http import HTTPStatus
 
+from functools import wraps
+
 from flask import Flask, request
 from flask_restx import Resource, Api, fields
 from flask_cors import CORS
@@ -14,6 +16,7 @@ import users.queries as uq
 import cities.queries as cq
 import countries.queries as ctq
 import states.queries as stq
+import journals.queries as jq
 
 # import werkzeug.exceptions as wz
 
@@ -54,6 +57,8 @@ COUNTRIES_SEARCH_EP = '/countries/search'
 STATES_EP = '/states'
 STATES_RESP = 'states'
 STATES_SEARCH_EP = '/states/search'
+JOURNALS_EP = '/journals'
+JOURNALS_RESP = 'journals'
 
 # Swagger Models for Documentation
 city_model = api.model('City', {
@@ -123,6 +128,47 @@ pagination_response = api.model('PaginationMeta', {
     'has_prev': fields.Boolean(description='Has previous page',
                                example=False)
 })
+
+journal_model = api.model('Journal', {
+    'title': fields.String(required=True, description='Journal title',
+                           example='My trip to NYC'),
+    'body': fields.String(description='Journal body text',
+                          example='Visited Central Park'),
+    'location_type': fields.String(
+        required=True,
+        description='Type of location',
+        enum=['country', 'state', 'city'],
+        example='city'),
+    'location_name': fields.String(required=True,
+                                   description='Location name',
+                                   example='New York'),
+    'state_code': fields.String(description='State code (if applicable)',
+                                example='NY'),
+    'iso_code': fields.String(description='ISO country code',
+                              example='US'),
+    'lat': fields.Float(description='Latitude', example=40.7128),
+    'lng': fields.Float(description='Longitude', example=-74.006),
+    'visited_at': fields.String(description='Visit date (ISO)',
+                                example='2025-06-15'),
+})
+
+journal_response = api.model('JournalResponse', {
+    'journals': fields.Raw(description='List of journal entries'),
+    'count': fields.Integer(description='Number of journals returned'),
+})
+
+
+def require_login(f):
+    """Decorator that verifies the JWT from the Authorization header."""
+    @wraps(f)
+    def decorated(self, *args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        payload = auth.verify_token_header(auth_header)
+        if not payload:
+            return {'error': 'Authentication required'}, 401
+        return f(self, *args, user_id=payload['user_id'], **kwargs)
+    return decorated
+
 
 # Create namespaces for better organization
 geographic_ns = api.namespace('geographic',
@@ -1119,6 +1165,140 @@ class Login(Resource):
 
         except Exception as e:
             return {"error": str(e)}, 500
+
+
+@api.route(JOURNALS_EP)
+class Journals(Resource):
+    """
+    Journal entries for the authenticated user.
+    """
+
+    @api.doc('get_user_journals')
+    @api.doc(params={
+        'location_type': 'Filter by location type (optional)',
+        'page': 'Page number (optional)',
+        'limit': 'Items per page (optional)',
+    })
+    @api.response(200, 'Success', journal_response)
+    @api.response(401, 'Authentication required', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    @require_login
+    def get(self, user_id=None):
+        """
+        List journal entries for the logged-in user.
+        """
+        try:
+            loc_type = request.args.get('location_type')
+            page = request.args.get('page', 1, type=int)
+            limit = request.args.get('limit', 50, type=int)
+            data = jq.read_by_user(
+                user_id, location_type=loc_type,
+                page=page, limit=limit)
+            return {
+                JOURNALS_RESP: dbc.deep_convert_object_ids(data['items']),
+                'count': len(data['items']),
+                'pagination': {
+                    'page': data['page'],
+                    'limit': data['limit'],
+                    'total': data['total'],
+                    'pages': data['pages'],
+                    'has_next': data['has_next'],
+                    'has_prev': data['has_prev'],
+                },
+            }
+        except ValueError as e:
+            return {'error': str(e)}, 400
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+    @api.doc('create_journal')
+    @api.expect(journal_model)
+    @api.response(201, 'Journal created successfully', success_response)
+    @api.response(400, 'Validation Error', error_response)
+    @api.response(401, 'Authentication required', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    @require_login
+    def post(self, user_id=None):
+        """
+        Create a new journal entry for the logged-in user.
+        """
+        try:
+            data = request.json
+            new_id = jq.create(user_id, data)
+            return {
+                MESSAGE: 'Journal created successfully',
+                'id': new_id,
+            }, 201
+        except ValueError as e:
+            return {'error': str(e)}, 400
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+
+@api.route(f'{JOURNALS_EP}/<journal_id>')
+class JournalById(Resource):
+    """
+    Operations on a single journal entry.
+    """
+
+    @api.doc('get_journal_by_id')
+    @api.response(200, 'Success')
+    @api.response(401, 'Authentication required', error_response)
+    @api.response(404, 'Journal not found', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    @require_login
+    def get(self, journal_id, user_id=None):
+        """
+        Get a single journal entry by ID.
+        """
+        try:
+            doc = jq.read_one(journal_id, user_id)
+            return {
+                JOURNALS_RESP: dbc.deep_convert_object_ids(doc),
+            }
+        except ValueError as e:
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+    @api.doc('update_journal_by_id')
+    @api.expect(journal_model)
+    @api.response(200, 'Journal updated successfully')
+    @api.response(400, 'Validation Error', error_response)
+    @api.response(401, 'Authentication required', error_response)
+    @api.response(404, 'Journal not found', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    @require_login
+    def put(self, journal_id, user_id=None):
+        """
+        Update a journal entry (title, body, visited_at).
+        """
+        try:
+            data = request.json
+            jq.update(journal_id, user_id, data)
+            return {MESSAGE: 'Journal updated successfully'}
+        except ValueError as e:
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+    @api.doc('delete_journal_by_id')
+    @api.response(200, 'Journal deleted successfully')
+    @api.response(401, 'Authentication required', error_response)
+    @api.response(404, 'Journal not found', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    @require_login
+    def delete(self, journal_id, user_id=None):
+        """
+        Delete a journal entry.
+        """
+        try:
+            jq.delete(journal_id, user_id)
+            return {MESSAGE: 'Journal deleted successfully'}
+        except ValueError as e:
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
 
 
 if __name__ == '__main__':

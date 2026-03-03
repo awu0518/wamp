@@ -3,7 +3,7 @@
 
 PROJ_DIR=bogosorters
 VENV=bogosorters
-PA_DOMAIN="limjiannn.pythonanywhere.com"
+PA_DOMAIN="wamp-limjiannn.pythonanywhere.com"
 PA_USER='limjiannn'
 echo "Project dir = $PROJ_DIR"
 echo "PA domain = $PA_DOMAIN"

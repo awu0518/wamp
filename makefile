@@ -12,6 +12,7 @@ CITIES_DIR = cities
 COUNTRIES_DIR = countries
 STATES_DIR = states
 USERS_DIR = users
+JOURNALS_DIR = journals
 
 FORCE:
 
@@ -28,6 +29,7 @@ all_tests: FORCE
 	cd $(COUNTRIES_DIR); make tests
 	cd $(STATES_DIR); make tests
 	cd $(USERS_DIR); make tests
+	cd $(JOURNALS_DIR); make tests
 	# cd $(DB_DIR); make tests
 
 dev_env: FORCE
