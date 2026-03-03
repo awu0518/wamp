@@ -5,6 +5,7 @@ We may be required to use a new database at any point.
 import os
 import pymongo as pm
 import time
+from datetime import datetime
 from pymongo.errors import ServerSelectionTimeoutError, PyMongoError
 from functools import wraps
 from typing import Callable, TypeVar, Any
@@ -124,16 +125,16 @@ def convert_mongo_id(doc: dict):
 
 def deep_convert_object_ids(obj: Any) -> Any:
     """
-    Recursively convert any BSON ObjectId values inside a dict/list structure
-    into their string representation so results are JSON-serializable.
-
-    Examples:
-        deep_convert_object_ids({'_id': ObjectId(...), 'nested': [{'x': ObjectId(...)}]})
+    Recursively convert non-JSON-serializable MongoDB types (ObjectId,
+    datetime) into their string representations.
 
     This returns a new object and does not mutate the input.
     """
     if isinstance(obj, ObjectId):
         return str(obj)
+
+    if isinstance(obj, datetime):
+        return obj.isoformat()
 
     if isinstance(obj, dict):
         return {k: deep_convert_object_ids(v) for k, v in obj.items()}
