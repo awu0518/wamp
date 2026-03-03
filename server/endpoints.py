@@ -1134,7 +1134,7 @@ class Register(Resource):
 
             return {
                 "message": "User created successfully",
-                "user_id": user[uq.ID]
+                "user_id": str(user[uq.ID])
             }, 201
 
         except ValueError as e:
@@ -1160,7 +1160,7 @@ class Login(Resource):
 
             return {
                 "token": token,
-                "user": user_data
+                "user": dbc.deep_convert_object_ids(user_data)
             }
 
         except Exception as e:
