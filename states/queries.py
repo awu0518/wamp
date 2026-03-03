@@ -20,6 +20,8 @@ ABBREVIATION = 'abbreviation'  # Alias for state_code
 CAPITAL = 'capital'
 POPULATION = 'population'
 REGION = 'region'
+REVIEW_COUNT = 'review_count'
+AVG_RATING = 'avg_rating'
 
 state_cache = {}
 CACHE_EXPIRY_SECONDS = 300  # 5 minutes
@@ -38,6 +40,8 @@ SAMPLE_STATE = {
     STATE_CODE: 'NY',
     CAPITAL: 'Albany',
     REGION: 'Northeast',
+    REVIEW_COUNT: 0,
+    AVG_RATING: None,
 }
 
 
@@ -67,6 +71,13 @@ def num_states() -> int:
 def read() -> dict:
     """Read all states from MongoDB as a dictionary."""
     states = dbc.read_dict(STATE_COLLECTION, key=NAME)
+
+    # Add metadata to each state
+    for name, data in states.items():
+        if REVIEW_COUNT not in data:
+            data[REVIEW_COUNT] = 0
+        if AVG_RATING not in data:
+            data[AVG_RATING] = None
 
     # Update cache with timestamp
     current_time = time.time()

@@ -12,6 +12,8 @@ CITY_COLLECTION = 'cities'
 ID = 'id'
 NAME = 'name'
 STATE_CODE = 'state_code'
+REVIEW_COUNT = 'review_count'
+AVG_RATING = 'avg_rating'
 
 # Cache configuration
 CACHE_MAX_SIZE = 100  # Maximum number of cities to cache
@@ -21,6 +23,8 @@ city_cache = {}  # {city_name: {'data': city_data, 'timestamp': time}}
 SAMPLE_CITY = {
     NAME: 'New York',
     STATE_CODE: 'NY',
+    REVIEW_COUNT: 0,
+    AVG_RATING: None,
 }
 
 
@@ -89,8 +93,12 @@ def read() -> dict:
     # For bulk read, we'll still go to database to ensure freshness
     # but cache individual entries for subsequent read_one calls
     cities = dbc.read_dict(CITY_COLLECTION, key=NAME)
-    # Cache each city individually
+    # Add metadata to each city
     for city_name, city_data in cities.items():
+        if REVIEW_COUNT not in city_data:
+            city_data[REVIEW_COUNT] = 0
+        if AVG_RATING not in city_data:
+            city_data[AVG_RATING] = None
         _cache_city(city_name, city_data)
     return cities
 
@@ -191,6 +199,9 @@ def update(city_id: str, flds: dict) -> bool:
         # Delete old record and create new one with updated name
         old_city = cities[city_id].copy()
         old_city.update(flds)
+        # Remove metadata fields before creating
+        old_city.pop(REVIEW_COUNT, None)
+        old_city.pop(AVG_RATING, None)
         delete(city_id, old_city.get(STATE_CODE, ''))
         create(old_city)
         _invalidate_cache_entry(city_id)

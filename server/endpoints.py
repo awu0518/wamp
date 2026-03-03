@@ -60,7 +60,11 @@ city_model = api.model('City', {
     'name': fields.String(required=True, description='City name',
                           example='New York'),
     'state_code': fields.String(required=True, description='State code',
-                                example='NY')
+                                example='NY'),
+    'review_count': fields.Integer(description='Number of reviews',
+                                   example=5),
+    'avg_rating': fields.Float(description='Average rating (1-5)',
+                               example=4.2, allow_null=True)
 })
 
 city_response = api.model('CityResponse', {
@@ -72,7 +76,11 @@ country_model = api.model('Country', {
     'name': fields.String(required=True, description='Country name',
                           example='United States'),
     'iso_code': fields.String(required=True, description='ISO country code',
-                              example='US')
+                              example='US'),
+    'review_count': fields.Integer(description='Number of reviews',
+                                   example=5),
+    'avg_rating': fields.Float(description='Average rating (1-5)',
+                               example=4.2, allow_null=True)
 })
 
 country_response = api.model('CountryResponse', {
@@ -87,7 +95,11 @@ state_model = api.model('State', {
     'state_code': fields.String(required=True, description='State code',
                                 example='NY'),
     'capital': fields.String(required=True, description='Capital city',
-                             example='Albany')
+                             example='Albany'),
+    'review_count': fields.Integer(description='Number of reviews',
+                                   example=5),
+    'avg_rating': fields.Float(description='Average rating (1-5)',
+                               example=4.2, allow_null=True)
 })
 
 state_response = api.model('StateResponse', {

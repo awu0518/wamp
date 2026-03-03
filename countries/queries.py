@@ -12,6 +12,8 @@ COUNTRY_COLLECTION = 'countries'
 ID = 'id'
 NAME = 'name'
 ISO_CODE = 'iso_code'
+REVIEW_COUNT = 'review_count'
+AVG_RATING = 'avg_rating'
 
 # In-memory cache for testing
 country_cache = {}
@@ -20,6 +22,8 @@ _next_id = 1
 SAMPLE_COUNTRY = {
     NAME: 'United States',
     ISO_CODE: 'US',
+    REVIEW_COUNT: 0,
+    AVG_RATING: None,
 }
 
 
@@ -52,7 +56,14 @@ def read() -> dict:
         return dict(country_cache)
     # Otherwise, read from database
     try:
-        return dbc.read_dict(COUNTRY_COLLECTION, key=NAME)
+        countries = dbc.read_dict(COUNTRY_COLLECTION, key=NAME)
+        # Add metadata to each country
+        for name, country in countries.items():
+            if REVIEW_COUNT not in country:
+                country[REVIEW_COUNT] = 0
+            if AVG_RATING not in country:
+                country[AVG_RATING] = None
+        return countries
     except Exception:
         return {}
 
