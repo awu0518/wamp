@@ -47,7 +47,8 @@ def test_create_success(clear_country_cache):
     flds = {cq.NAME: "Narnia", cq.ISO_CODE: "NA"}
     new_id = cq.create(flds)
     assert new_id == "1"
-    assert cq.country_cache["1"] == flds
+    expected = {cq.NAME: "Narnia", cq.ISO_CODE: "NA", cq.REVIEW_COUNT: 0}
+    assert cq.country_cache["1"] == expected
     assert cq.num_countries() == 1
 
 

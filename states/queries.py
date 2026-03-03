@@ -21,7 +21,6 @@ CAPITAL = 'capital'
 POPULATION = 'population'
 REGION = 'region'
 REVIEW_COUNT = 'review_count'
-AVG_RATING = 'avg_rating'
 
 state_cache = {}
 CACHE_EXPIRY_SECONDS = 300  # 5 minutes
@@ -41,7 +40,6 @@ SAMPLE_STATE = {
     CAPITAL: 'Albany',
     REGION: 'Northeast',
     REVIEW_COUNT: 0,
-    AVG_RATING: None,
 }
 
 
@@ -76,8 +74,6 @@ def read() -> dict:
     for name, data in states.items():
         if REVIEW_COUNT not in data:
             data[REVIEW_COUNT] = 0
-        if AVG_RATING not in data:
-            data[AVG_RATING] = None
 
     # Update cache with timestamp
     current_time = time.time()
@@ -170,12 +166,24 @@ def create(flds: dict) -> str:
     if REGION in flds:
         validate_region(flds[REGION])
 
-    new_id = dbc.create(STATE_COLLECTION, flds)
+    create_doc = {
+        NAME: flds[NAME],
+        STATE_CODE: flds[STATE_CODE],
+        REVIEW_COUNT: 0,
+    }
+    if CAPITAL in flds:
+        create_doc[CAPITAL] = flds[CAPITAL]
+    if POPULATION in flds:
+        create_doc[POPULATION] = flds[POPULATION]
+    if REGION in flds:
+        create_doc[REGION] = flds[REGION]
+
+    new_id = dbc.create(STATE_COLLECTION, create_doc)
 
     # Update cache
-    if NAME in flds:
-        state_cache[flds[NAME]] = {
-            'data': flds.copy(),
+    if NAME in create_doc:
+        state_cache[create_doc[NAME]] = {
+            'data': create_doc.copy(),
             'timestamp': time.time()
         }
 
@@ -194,6 +202,50 @@ def delete(state_id: str) -> bool:
     # Remove from cache
     if state_id in state_cache:
         del state_cache[state_id]
+
+    return True
+
+
+def increment_review_count(state_name: str, increment_by: int = 1) -> bool:
+    """
+    Increment review_count for a state identified by name.
+
+    Args:
+        state_name: State name key
+        increment_by: Positive increment amount (default 1)
+
+    Returns:
+        True if increment succeeds
+    """
+    if not isinstance(state_name, str) or not state_name.strip():
+        raise ValueError('state_name must be a non-empty string')
+    if not isinstance(increment_by, int) or increment_by < 1:
+        raise ValueError('increment_by must be a positive integer')
+
+    normalized_name = state_name.strip()
+    states = read()
+    if normalized_name not in states:
+        raise ValueError(f'No such state: {normalized_name}')
+
+    if normalized_name in state_cache:
+        state_cache[normalized_name]['data'][REVIEW_COUNT] = (
+            state_cache[normalized_name]['data'].get(REVIEW_COUNT, 0)
+            + increment_by
+        )
+        state_cache[normalized_name]['timestamp'] = time.time()
+
+    try:
+        client = dbc.get_client()
+        result = client[dbc.SE_DB][STATE_COLLECTION].update_one(
+            {NAME: normalized_name},
+            {'$inc': {REVIEW_COUNT: increment_by}}
+        )
+        if normalized_name not in state_cache and result.matched_count < 1:
+            raise ValueError(f'State not found: {normalized_name}')
+    except Exception:
+        if normalized_name in state_cache:
+            return True
+        raise
 
     return True
 

@@ -13,7 +13,6 @@ ID = 'id'
 NAME = 'name'
 ISO_CODE = 'iso_code'
 REVIEW_COUNT = 'review_count'
-AVG_RATING = 'avg_rating'
 
 # In-memory cache for testing
 country_cache = {}
@@ -23,7 +22,6 @@ SAMPLE_COUNTRY = {
     NAME: 'United States',
     ISO_CODE: 'US',
     REVIEW_COUNT: 0,
-    AVG_RATING: None,
 }
 
 
@@ -61,8 +59,6 @@ def read() -> dict:
         for name, country in countries.items():
             if REVIEW_COUNT not in country:
                 country[REVIEW_COUNT] = 0
-            if AVG_RATING not in country:
-                country[AVG_RATING] = None
         return countries
     except Exception:
         return {}
@@ -127,19 +123,67 @@ def create(flds: dict) -> str:
     # Validate ISO code format (2-3 uppercase letters)
     validation.validate_iso_code(flds[ISO_CODE], 'iso_code')
 
+    create_doc = {
+        NAME: flds[NAME],
+        ISO_CODE: flds[ISO_CODE],
+        REVIEW_COUNT: 0,
+    }
+
     # Use cache for testing
     new_id = str(_next_id)
     _next_id += 1
-    country_cache[new_id] = dict(flds)
+    country_cache[new_id] = dict(create_doc)
 
     # Also store in database if available
     # Pass a copy to avoid modifying the original flds dict
     try:
-        dbc.create(COUNTRY_COLLECTION, dict(flds))
+        dbc.create(COUNTRY_COLLECTION, dict(create_doc))
     except Exception:
         pass  # Ignore DB errors during testing
 
     return new_id
+
+
+def increment_review_count(country_name: str, increment_by: int = 1) -> bool:
+    """
+    Increment review_count for a country identified by name.
+
+    Args:
+        country_name: Country name key
+        increment_by: Positive increment amount (default 1)
+
+    Returns:
+        True if increment succeeds
+    """
+    if not isinstance(country_name, str) or not country_name.strip():
+        raise ValueError('country_name must be a non-empty string')
+    if not isinstance(increment_by, int) or increment_by < 1:
+        raise ValueError('increment_by must be a positive integer')
+
+    normalized_name = country_name.strip()
+    countries = read()
+    if normalized_name not in countries:
+        raise ValueError(f'No such country: {normalized_name}')
+
+    if normalized_name in country_cache:
+        country_cache[normalized_name][REVIEW_COUNT] = (
+            country_cache[normalized_name].get(REVIEW_COUNT, 0) + increment_by
+        )
+
+    try:
+        client = dbc.get_client()
+        result = client[dbc.SE_DB][COUNTRY_COLLECTION].update_one(
+            {NAME: normalized_name},
+            {'$inc': {REVIEW_COUNT: increment_by}}
+        )
+        if normalized_name not in country_cache and result.matched_count < 1:
+            raise ValueError(f'Country not found: {normalized_name}')
+    except Exception:
+        if normalized_name in country_cache:
+            return True
+        raise
+
+    return True
 
 
 def delete(country_id: str) -> bool:

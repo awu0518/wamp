@@ -62,9 +62,7 @@ city_model = api.model('City', {
     'state_code': fields.String(required=True, description='State code',
                                 example='NY'),
     'review_count': fields.Integer(description='Number of reviews',
-                                   example=5),
-    'avg_rating': fields.Float(description='Average rating (1-5)',
-                               example=4.2, allow_null=True)
+                                   example=5)
 })
 
 city_response = api.model('CityResponse', {
@@ -78,9 +76,7 @@ country_model = api.model('Country', {
     'iso_code': fields.String(required=True, description='ISO country code',
                               example='US'),
     'review_count': fields.Integer(description='Number of reviews',
-                                   example=5),
-    'avg_rating': fields.Float(description='Average rating (1-5)',
-                               example=4.2, allow_null=True)
+                                   example=5)
 })
 
 country_response = api.model('CountryResponse', {
@@ -97,9 +93,7 @@ state_model = api.model('State', {
     'capital': fields.String(required=True, description='Capital city',
                              example='Albany'),
     'review_count': fields.Integer(description='Number of reviews',
-                                   example=5),
-    'avg_rating': fields.Float(description='Average rating (1-5)',
-                               example=4.2, allow_null=True)
+                                   example=5)
 })
 
 state_response = api.model('StateResponse', {
@@ -389,6 +383,42 @@ class CityByName(Resource):
             return {'error': str(e)}, 500
 
 
+@api.route(f'{CITIES_EP}/<city_name>/reviews/increment')
+class CityReviewCountIncrement(Resource):
+    """
+    Increment review count for a city by name.
+    """
+
+    @api.doc('increment_city_review_count')
+    @api.doc(params={
+        'state_code': 'State code for disambiguating city name (required)'
+    })
+    @api.response(200, 'Review count incremented successfully')
+    @api.response(400, 'Missing or invalid state_code', error_response)
+    @api.response(404, 'City not found', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    def post(self, city_name):
+        """
+        Increment a city's review_count by 1.
+        Requires state_code as query parameter.
+        """
+        try:
+            state_code = request.args.get('state_code')
+            if not state_code:
+                return {'error': 'state_code query parameter is required'}, 400
+
+            cq.increment_review_count(city_name, state_code)
+            return {
+                MESSAGE: f'Review count incremented for {city_name}'
+            }
+        except ValueError as e:
+            if 'state_code' in str(e):
+                return {'error': str(e)}, 400
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+
 @api.route(CITIES_SEARCH_EP)
 class CitiesSearch(Resource):
     """
@@ -581,6 +611,31 @@ class CountryById(Resource):
             return {'error': str(e)}, 500
 
 
+@api.route(f'{COUNTRIES_EP}/<country_name>/reviews/increment')
+class CountryReviewCountIncrement(Resource):
+    """
+    Increment review count for a country by name.
+    """
+
+    @api.doc('increment_country_review_count')
+    @api.response(200, 'Review count incremented successfully')
+    @api.response(404, 'Country not found', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    def post(self, country_name):
+        """
+        Increment a country's review_count by 1.
+        """
+        try:
+            ctq.increment_review_count(country_name)
+            return {
+                MESSAGE: f'Review count incremented for {country_name}'
+            }
+        except ValueError as e:
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+
 @api.route(COUNTRIES_SEARCH_EP)
 class CountriesSearch(Resource):
     """
@@ -753,6 +808,31 @@ class StateById(Resource):
         try:
             stq.delete(state_id)
             return {MESSAGE: f'State {state_id} deleted successfully'}
+        except ValueError as e:
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+
+@api.route(f'{STATES_EP}/<state_name>/reviews/increment')
+class StateReviewCountIncrement(Resource):
+    """
+    Increment review count for a state by name.
+    """
+
+    @api.doc('increment_state_review_count')
+    @api.response(200, 'Review count incremented successfully')
+    @api.response(404, 'State not found', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    def post(self, state_name):
+        """
+        Increment a state's review_count by 1.
+        """
+        try:
+            stq.increment_review_count(state_name)
+            return {
+                MESSAGE: f'Review count incremented for {state_name}'
+            }
         except ValueError as e:
             return {'error': str(e)}, 404
         except Exception as e:

@@ -13,7 +13,6 @@ ID = 'id'
 NAME = 'name'
 STATE_CODE = 'state_code'
 REVIEW_COUNT = 'review_count'
-AVG_RATING = 'avg_rating'
 
 # Cache configuration
 CACHE_MAX_SIZE = 100  # Maximum number of cities to cache
@@ -24,7 +23,6 @@ SAMPLE_CITY = {
     NAME: 'New York',
     STATE_CODE: 'NY',
     REVIEW_COUNT: 0,
-    AVG_RATING: None,
 }
 
 
@@ -97,8 +95,6 @@ def read() -> dict:
     for city_name, city_data in cities.items():
         if REVIEW_COUNT not in city_data:
             city_data[REVIEW_COUNT] = 0
-        if AVG_RATING not in city_data:
-            city_data[AVG_RATING] = None
         _cache_city(city_name, city_data)
     return cities
 
@@ -136,7 +132,13 @@ def create(flds: dict) -> str:
     # Validate state code format (2 uppercase letters)
     validation.validate_state_code(flds[STATE_CODE], 'state_code')
 
-    new_id = dbc.create(CITY_COLLECTION, flds)
+    create_doc = {
+        NAME: flds[NAME],
+        STATE_CODE: flds[STATE_CODE],
+        REVIEW_COUNT: 0,
+    }
+
+    new_id = dbc.create(CITY_COLLECTION, create_doc)
     # Invalidate cache entry if it exists (unlikely but possible)
     city_name = flds.get(NAME)
     if city_name:
@@ -151,6 +153,52 @@ def delete(name: str, state_code: str) -> bool:
     # Invalidate cache entry
     _invalidate_cache_entry(name)
     return ret
+
+
+def increment_review_count(city_name: str, state_code: str,
+                           increment_by: int = 1) -> bool:
+    """
+    Increment review_count for a city identified by name and state_code.
+
+    Args:
+        city_name: City name key
+        state_code: Two-letter state code
+        increment_by: Positive increment amount (default 1)
+
+    Returns:
+        True if increment succeeds
+    """
+    if not isinstance(city_name, str) or not city_name.strip():
+        raise ValueError('city_name must be a non-empty string')
+    validation.validate_state_code(state_code, 'state_code')
+    if not isinstance(increment_by, int) or increment_by < 1:
+        raise ValueError('increment_by must be a positive integer')
+
+    normalized_name = city_name.strip()
+    normalized_state_code = state_code.strip().upper()
+    query_filter = {NAME: normalized_name, STATE_CODE: normalized_state_code}
+
+    if normalized_name in city_cache:
+        cache_data = city_cache[normalized_name].get('data', {})
+        if cache_data.get(STATE_CODE) == normalized_state_code:
+            current_count = cache_data.get(REVIEW_COUNT, 0)
+            cache_data[REVIEW_COUNT] = current_count + increment_by
+            city_cache[normalized_name]['timestamp'] = time.time()
+
+    try:
+        client = dbc.get_client()
+        result = client[dbc.SE_DB][CITY_COLLECTION].update_one(
+            query_filter,
+            {'$inc': {REVIEW_COUNT: increment_by}}
+        )
+        if result.matched_count < 1:
+            raise ValueError(
+                f'City not found: {normalized_name}, {normalized_state_code}'
+            )
+    except Exception:
+        raise
+
+    return True
 
 
 def read_one(city_id: str) -> dict:
@@ -201,7 +249,6 @@ def update(city_id: str, flds: dict) -> bool:
         old_city.update(flds)
         # Remove metadata fields before creating
         old_city.pop(REVIEW_COUNT, None)
-        old_city.pop(AVG_RATING, None)
         delete(city_id, old_city.get(STATE_CODE, ''))
         create(old_city)
         _invalidate_cache_entry(city_id)
