@@ -1132,9 +1132,12 @@ class Register(Resource):
 
             user = uq.create_user(email, username, password_hash)
 
+            token = auth.generate_token(str(user[uq.ID]), email)
+
             return {
                 "message": "User created successfully",
-                "user_id": str(user[uq.ID])
+                "user_id": str(user[uq.ID]),
+                "token": token
             }, 201
 
         except ValueError as e:
