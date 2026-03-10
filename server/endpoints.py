@@ -95,8 +95,6 @@ state_model = api.model('State', {
                           example='New York'),
     'state_code': fields.String(required=True, description='State code',
                                 example='NY'),
-    'capital': fields.String(required=True, description='Capital city',
-                             example='Albany'),
     'review_count': fields.Integer(description='Number of reviews',
                                    example=5)
 })
@@ -787,8 +785,7 @@ class States(Resource):
     def post(self):
         """
         Create a new state.
-        Expected JSON body: {"name": "State Name", "state_code": "ST",
-                            "capital": "Capital City"}
+        Expected JSON body: {"name": "State Name", "state_code": "ST"}
         """
         try:
             data = request.json
@@ -888,7 +885,7 @@ class StateReviewCountIncrement(Resource):
 @api.route(STATES_SEARCH_EP)
 class StatesSearch(Resource):
     """
-    Search states by name, state code, and/or capital.
+    Search states by name and/or state code.
     """
     @api.doc('search_states')
     @api.response(200, 'Search results', state_response)
@@ -897,19 +894,16 @@ class StatesSearch(Resource):
     def get(self):
         """
         Search states with optional filters.
-        Query params: name (substring), state_code (exact), capital (substring)
+        Query params: name (substring), state_code (exact)
         """
         try:
             name = request.args.get('name')
             state_code = request.args.get('state_code')
-            capital = request.args.get('capital')
-            if not name and not state_code and not capital:
+            if not name and not state_code:
                 err = ('Provide at least one parameter: '
-                       'name, state_code, or capital')
+                       'name or state_code')
                 return {'error': err}, 400
-            results = stq.search(
-                name=name, state_code=state_code, capital=capital
-            )
+            results = stq.search(name=name, state_code=state_code)
             return {
                 STATES_RESP: results,
                 'count': len(results)

@@ -6,7 +6,7 @@ import io
 import json
 import time
 from random import randint
-from typing import Optional, List
+from typing import Optional
 import data.db_connect as dbc
 import validation
 
@@ -17,28 +17,14 @@ ID = 'id'
 NAME = 'name'
 STATE_CODE = 'state_code'
 ABBREVIATION = 'abbreviation'  # Alias for state_code
-CAPITAL = 'capital'
-POPULATION = 'population'
-REGION = 'region'
 REVIEW_COUNT = 'review_count'
 
 state_cache = {}
 CACHE_EXPIRY_SECONDS = 300  # 5 minutes
 
-# Valid US regions
-VALID_REGIONS = [
-    'Northeast',
-    'Southeast',
-    'Midwest',
-    'Southwest',
-    'West',
-]
-
 SAMPLE_STATE = {
     NAME: 'New York',
     STATE_CODE: 'NY',
-    CAPITAL: 'Albany',
-    REGION: 'Northeast',
     REVIEW_COUNT: 0,
 }
 
@@ -142,9 +128,8 @@ def create(flds: dict) -> str:
     # Validate required fields
     validation.validate_required_fields(flds, [NAME, STATE_CODE])
 
-    # Validate no extra fields (allow optional fields)
-    allowed = [NAME, STATE_CODE, CAPITAL, POPULATION, REGION]
-    validation.validate_no_extra_fields(flds, allowed)
+    # Validate no extra fields
+    validation.validate_no_extra_fields(flds, [NAME, STATE_CODE])
 
     # Validate name
     validation.validate_string_length(flds[NAME], 'name',
@@ -153,30 +138,11 @@ def create(flds: dict) -> str:
     # Validate state code format (2 uppercase letters)
     validation.validate_state_code(flds[STATE_CODE], 'state_code')
 
-    # Optional: validate capital if present
-    if CAPITAL in flds:
-        validation.validate_string_length(flds[CAPITAL], 'capital',
-                                          min_length=1, max_length=100)
-
-    # Optional: validate population if present
-    if POPULATION in flds:
-        validation.validate_positive_integer(flds[POPULATION], 'population')
-
-    # Optional: validate region if present
-    if REGION in flds:
-        validate_region(flds[REGION])
-
     create_doc = {
         NAME: flds[NAME],
         STATE_CODE: flds[STATE_CODE],
         REVIEW_COUNT: 0,
     }
-    if CAPITAL in flds:
-        create_doc[CAPITAL] = flds[CAPITAL]
-    if POPULATION in flds:
-        create_doc[POPULATION] = flds[POPULATION]
-    if REGION in flds:
-        create_doc[REGION] = flds[REGION]
 
     new_id = dbc.create(STATE_COLLECTION, create_doc)
 
@@ -260,7 +226,7 @@ def update(state_id: str, flds: dict) -> bool:
         raise ValueError(f'Bad type for {type(flds)=}')
 
     # Validate no extra fields
-    allowed = [NAME, STATE_CODE, CAPITAL, POPULATION, REGION]
+    allowed = [NAME, STATE_CODE]
     validation.validate_no_extra_fields(flds, allowed)
 
     # Validate name if present
@@ -271,19 +237,6 @@ def update(state_id: str, flds: dict) -> bool:
     # Validate state code if present
     if STATE_CODE in flds:
         validation.validate_state_code(flds[STATE_CODE], 'state_code')
-
-    # Validate capital if present
-    if CAPITAL in flds:
-        validation.validate_string_length(flds[CAPITAL], 'capital',
-                                          min_length=1, max_length=100)
-
-    # Validate population if present
-    if POPULATION in flds:
-        validation.validate_positive_integer(flds[POPULATION], 'population')
-
-    # Validate region if present
-    if REGION in flds:
-        validate_region(flds[REGION])
 
     states = read()
     if state_id not in states:
@@ -307,16 +260,13 @@ def update(state_id: str, flds: dict) -> bool:
     return True
 
 
-def search(name: str = None, state_code: str = None,
-           capital: str = None) -> dict:
+def search(name: str = None, state_code: str = None) -> dict:
     """
-    Search states by name, state_code, and/or capital (case-insensitive).
+    Search states by name and/or state_code (case-insensitive).
 
     Args:
         name: State name substring to search for
         state_code: State code to filter by (exact match)
-        capital: Capital name substring to search for
-
     Returns:
         Dictionary of matching states
     """
@@ -332,11 +282,6 @@ def search(name: str = None, state_code: str = None,
         if state_code:
             data_code = state_data.get(STATE_CODE, '').upper()
             if data_code != state_code.upper():
-                match = False
-
-        if capital:
-            data_capital = state_data.get(CAPITAL, '').lower()
-            if capital.lower() not in data_capital:
                 match = False
 
         if match:
@@ -388,7 +333,7 @@ def bulk_update(updates: list) -> dict:
     Args:
         updates: List of update dictionaries with 'id' and 'fields'
                  Example: [{"id": "New York",
-                            "fields": {"capital": "Albany"}}, ...]
+                            "fields": {"state_code": "NY"}}, ...]
 
     Returns:
         Dictionary with success count, failure count, and errors
@@ -464,97 +409,6 @@ def bulk_delete(ids: list) -> dict:
                 "id": state_id,
                 "error": str(e)
             })
-
-    return results
-
-
-def validate_region(region: str) -> None:
-    """
-    Validate that a region is one of the valid US regions.
-
-    Args:
-        region: The region string to validate
-
-    Raises:
-        ValueError: If the region is not valid
-    """
-    if not isinstance(region, str):
-        type_name = type(region).__name__
-        raise ValueError(f"Region must be a string, got {type_name}")
-    if region not in VALID_REGIONS:
-        valid = ', '.join(VALID_REGIONS)
-        raise ValueError(f"Invalid region '{region}'. Must be one of: {valid}")
-
-
-def get_by_region(region: str) -> dict:
-    """
-    Get all states in a specific region.
-
-    Args:
-        region: The region to filter by (case-sensitive)
-
-    Returns:
-        Dictionary of states in the specified region
-
-    Raises:
-        ValueError: If the region is not valid
-    """
-    validate_region(region)
-    states = read()
-    return {
-        name: data for name, data in states.items()
-        if data.get(REGION) == region
-    }
-
-
-def get_regions() -> List[str]:
-    """
-    Get list of all valid regions.
-
-    Returns:
-        List of valid region names
-    """
-    return list(VALID_REGIONS)
-
-
-def get_by_population_range(
-    min_pop: int = None,
-    max_pop: int = None
-) -> dict:
-    """
-    Get all states within a population range.
-
-    Args:
-        min_pop: Minimum population (inclusive). If None, no lower bound.
-        max_pop: Maximum population (inclusive). If None, no upper bound.
-
-    Returns:
-        Dictionary of states within the specified population range.
-
-    Raises:
-        ValueError: If min_pop > max_pop or if values are negative.
-    """
-    if min_pop is not None and min_pop < 0:
-        raise ValueError("min_pop cannot be negative")
-    if max_pop is not None and max_pop < 0:
-        raise ValueError("max_pop cannot be negative")
-    if min_pop is not None and max_pop is not None and min_pop > max_pop:
-        raise ValueError("min_pop cannot be greater than max_pop")
-
-    states = read()
-    results = {}
-
-    for name, data in states.items():
-        pop = data.get(POPULATION)
-        if pop is None:
-            continue
-
-        if min_pop is not None and pop < min_pop:
-            continue
-        if max_pop is not None and pop > max_pop:
-            continue
-
-        results[name] = data
 
     return results
 

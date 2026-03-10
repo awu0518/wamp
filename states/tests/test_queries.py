@@ -44,8 +44,7 @@ def temp_state():
     """Create a temporary state and yield its name (used as ID)"""
     flds = {
         sq.NAME: "TestState",
-        sq.STATE_CODE: "TS",
-        sq.CAPITAL: "TestCapital"
+        sq.STATE_CODE: "TS"
     }
     sq.create(flds)
     yield flds[sq.NAME]
@@ -61,8 +60,7 @@ def test_create_success():
     timestamp = int(time.time())
     test_state = {
         sq.NAME: f"TestState_{timestamp}",
-        sq.STATE_CODE: "TS",
-        sq.CAPITAL: "TestCapital"
+        sq.STATE_CODE: "TS"
     }
     
     result = sq.create(test_state)
@@ -128,7 +126,6 @@ def test_read_one_success(temp_state):
     state = sq.read_one(temp_state)
     assert state[sq.NAME] == "TestState"
     assert state[sq.STATE_CODE] == "TS"
-    assert state[sq.CAPITAL] == "TestCapital"
 
 
 def test_read_one_raises_on_missing():
@@ -147,20 +144,20 @@ def test_read_one_returns_copy(temp_state):
 
 def test_update_state_success(temp_state):
     """Test update function with valid input"""
-    new_data = {sq.CAPITAL: "NewCapital"}
+    new_data = {sq.STATE_CODE: "TT"}
     assert sq.update(temp_state, new_data) is True
     
     # Verify update
     states = sq.read()
-    assert states[temp_state][sq.CAPITAL] == "NewCapital"
+    assert states[temp_state][sq.STATE_CODE] == "TT"
     # Other fields should remain unchanged
-    assert states[temp_state][sq.STATE_CODE] == "TS"
+    assert states[temp_state][sq.NAME] == "TestState"
 
 
 def test_update_state_raises_on_missing():
     """Test update raises error for non-existent state"""
     with pytest.raises(ValueError, match="No such state"):
-        sq.update("NonExistentState", {sq.CAPITAL: "Ghost Capital"})
+        sq.update("NonExistentState", {sq.STATE_CODE: "ZZ"})
 
 
 def test_update_state_raises_on_bad_type(temp_state):
@@ -217,13 +214,6 @@ def test_search_by_state_code(temp_state):
     assert temp_state in results
 
 
-def test_search_by_capital(temp_state):
-    """Test search function with capital parameter"""
-    results = sq.search(capital="TestCapital")
-    assert len(results) >= 1
-    assert temp_state in results
-
-
 def test_search_combined(temp_state):
     """Test search function with multiple parameters"""
     results = sq.search(name="Test", state_code="TS")
@@ -243,112 +233,6 @@ def test_is_valid_id():
     assert sq.is_valid_id("California") is True
     assert sq.is_valid_id("") is False
     assert sq.is_valid_id(123) is False
-
-
-# ==================== Region Feature Tests ====================
-
-def test_get_regions():
-    """Test get_regions returns valid regions list"""
-    regions = sq.get_regions()
-    assert isinstance(regions, list)
-    assert len(regions) == 5
-    assert 'Northeast' in regions
-    assert 'Southeast' in regions
-    assert 'Midwest' in regions
-    assert 'Southwest' in regions
-    assert 'West' in regions
-
-
-def test_validate_region_valid():
-    """Test validate_region with valid regions"""
-    # Should not raise for valid regions
-    for region in sq.VALID_REGIONS:
-        sq.validate_region(region)  # No exception means pass
-
-
-def test_validate_region_invalid():
-    """Test validate_region raises for invalid region"""
-    with pytest.raises(ValueError, match="Invalid region"):
-        sq.validate_region("InvalidRegion")
-
-
-def test_validate_region_non_string():
-    """Test validate_region raises for non-string input"""
-    with pytest.raises(ValueError, match="must be a string"):
-        sq.validate_region(123)
-
-
-def test_get_by_region():
-    """Test get_by_region function"""
-    timestamp = int(time.time())
-    test_state = {
-        sq.NAME: f"RegionTestState_{timestamp}",
-        sq.STATE_CODE: "RT",
-        sq.REGION: "Northeast"
-    }
-    sq.create(test_state)
-
-    try:
-        results = sq.get_by_region("Northeast")
-        assert isinstance(results, dict)
-        assert test_state[sq.NAME] in results
-        assert results[test_state[sq.NAME]][sq.REGION] == "Northeast"
-    finally:
-        sq.delete(test_state[sq.NAME])
-
-
-def test_get_by_region_invalid():
-    """Test get_by_region raises for invalid region"""
-    with pytest.raises(ValueError, match="Invalid region"):
-        sq.get_by_region("InvalidRegion")
-
-
-def test_create_with_region():
-    """Test create function with region field"""
-    timestamp = int(time.time())
-    test_state = {
-        sq.NAME: f"RegionState_{timestamp}",
-        sq.STATE_CODE: "RG",
-        sq.CAPITAL: "RegionCapital",
-        sq.REGION: "Southwest"
-    }
-    new_id = sq.create(test_state)
-    assert new_id is not None
-
-    try:
-        state = sq.read_one(test_state[sq.NAME])
-        assert state[sq.REGION] == "Southwest"
-    finally:
-        sq.delete(test_state[sq.NAME])
-
-
-def test_create_with_invalid_region():
-    """Test create raises for invalid region"""
-    test_state = {
-        sq.NAME: "InvalidRegionState",
-        sq.STATE_CODE: "IR",
-        sq.REGION: "InvalidRegion"
-    }
-    with pytest.raises(ValueError, match="Invalid region"):
-        sq.create(test_state)
-
-
-def test_update_with_region():
-    """Test update function with region field"""
-    timestamp = int(time.time())
-    test_state = {
-        sq.NAME: f"UpdateRegionState_{timestamp}",
-        sq.STATE_CODE: "UR",
-        sq.REGION: "West"
-    }
-    sq.create(test_state)
-
-    try:
-        sq.update(test_state[sq.NAME], {sq.REGION: "Midwest"})
-        state = sq.read_one(test_state[sq.NAME])
-        assert state[sq.REGION] == "Midwest"
-    finally:
-        sq.delete(test_state[sq.NAME])
 
 
 # ==================== Export Feature Tests ====================
@@ -423,120 +307,6 @@ def test_export_to_csv_excludes_mongo_id():
     }
     result = sq.export_to_csv(test_data)
     assert "_id" not in result
-
-
-# ==================== Population Range Feature Tests ====================
-
-def test_get_by_population_range_with_bounds():
-    """Test get_by_population_range with both min and max"""
-    timestamp = int(time.time())
-    states = [
-        {sq.NAME: f"SmallState_{timestamp}", sq.STATE_CODE: "SA",
-         sq.POPULATION: 100000},
-        {sq.NAME: f"MedState_{timestamp}", sq.STATE_CODE: "MB",
-         sq.POPULATION: 500000},
-        {sq.NAME: f"BigState_{timestamp}", sq.STATE_CODE: "BC",
-         sq.POPULATION: 1000000},
-    ]
-
-    for state in states:
-        sq.create(state)
-
-    try:
-        results = sq.get_by_population_range(min_pop=200000, max_pop=800000)
-        assert f"MedState_{timestamp}" in results
-        assert f"SmallState_{timestamp}" not in results
-        assert f"BigState_{timestamp}" not in results
-    finally:
-        for state in states:
-            sq.delete(state[sq.NAME])
-
-
-def test_get_by_population_range_min_only():
-    """Test get_by_population_range with only min_pop"""
-    timestamp = int(time.time())
-    states = [
-        {sq.NAME: f"Small_{timestamp}", sq.STATE_CODE: "SD",
-         sq.POPULATION: 100000},
-        {sq.NAME: f"Big_{timestamp}", sq.STATE_CODE: "BE",
-         sq.POPULATION: 1000000},
-    ]
-
-    for state in states:
-        sq.create(state)
-
-    try:
-        results = sq.get_by_population_range(min_pop=500000)
-        assert f"Big_{timestamp}" in results
-        assert f"Small_{timestamp}" not in results
-    finally:
-        for state in states:
-            sq.delete(state[sq.NAME])
-
-
-def test_get_by_population_range_max_only():
-    """Test get_by_population_range with only max_pop"""
-    timestamp = int(time.time())
-    states = [
-        {sq.NAME: f"Tiny_{timestamp}", sq.STATE_CODE: "TF",
-         sq.POPULATION: 50000},
-        {sq.NAME: f"Large_{timestamp}", sq.STATE_CODE: "LG",
-         sq.POPULATION: 5000000},
-    ]
-
-    for state in states:
-        sq.create(state)
-
-    try:
-        results = sq.get_by_population_range(max_pop=100000)
-        assert f"Tiny_{timestamp}" in results
-        assert f"Large_{timestamp}" not in results
-    finally:
-        for state in states:
-            sq.delete(state[sq.NAME])
-
-
-def test_get_by_population_range_no_bounds():
-    """Test get_by_population_range with no bounds returns all with population"""
-    timestamp = int(time.time())
-    state_with_pop = {
-        sq.NAME: f"WithPop_{timestamp}",
-        sq.STATE_CODE: "WP",
-        sq.POPULATION: 100000
-    }
-    state_without_pop = {
-        sq.NAME: f"NoPop_{timestamp}",
-        sq.STATE_CODE: "NP"
-    }
-
-    sq.create(state_with_pop)
-    sq.create(state_without_pop)
-
-    try:
-        results = sq.get_by_population_range()
-        assert f"WithPop_{timestamp}" in results
-        assert f"NoPop_{timestamp}" not in results
-    finally:
-        sq.delete(state_with_pop[sq.NAME])
-        sq.delete(state_without_pop[sq.NAME])
-
-
-def test_get_by_population_range_negative_min():
-    """Test get_by_population_range raises for negative min_pop"""
-    with pytest.raises(ValueError, match="min_pop cannot be negative"):
-        sq.get_by_population_range(min_pop=-100)
-
-
-def test_get_by_population_range_negative_max():
-    """Test get_by_population_range raises for negative max_pop"""
-    with pytest.raises(ValueError, match="max_pop cannot be negative"):
-        sq.get_by_population_range(max_pop=-100)
-
-
-def test_get_by_population_range_min_greater_than_max():
-    """Test get_by_population_range raises when min > max"""
-    with pytest.raises(ValueError, match="min_pop cannot be greater"):
-        sq.get_by_population_range(min_pop=1000, max_pop=500)
 
 
 
