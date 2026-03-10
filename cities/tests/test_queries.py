@@ -60,17 +60,17 @@ def test_create_success(clear_city_cache):
     """Test create function with valid input"""
     # Use unique name to avoid conflicts
     test_city = {cq.NAME: f"TestCreateCity_{int(time.time())}", cq.STATE_CODE: "NY"}
-    
+
     result = cq.create(test_city)
-    
+
     # Should return a valid ID
     assert result is not None
-    # Cache should not contain the city after create (create only invalidates)
-    assert test_city[cq.NAME] not in cq.city_cache
-    # But the city should exist in the database
+    # Cache should contain the city after create
+    assert test_city[cq.NAME] in cq.city_cache
+    # And the city should exist in the database
     cities = cq.read()
     assert test_city[cq.NAME] in cities
-    
+
     # Clean up
     cq.delete(test_city[cq.NAME], test_city[cq.STATE_CODE])
 

@@ -1,6 +1,9 @@
 """
 This file deals with our country-level data.
 """
+import csv
+import io
+import json
 from random import randint
 from typing import Optional
 import data.db_connect as dbc
@@ -405,3 +408,69 @@ def bulk_delete(ids: list) -> dict:
             })
 
     return results
+
+
+def export_to_json(countries_data: dict = None, indent: int = 2) -> str:
+    """
+    Export countries data to JSON format.
+
+    Args:
+        countries_data: Dictionary of countries to export.
+                        If None, exports all countries.
+        indent: Number of spaces for JSON indentation (default 2)
+
+    Returns:
+        JSON string representation of the countries data
+    """
+    if countries_data is None:
+        countries_data = read()
+
+    # Convert to list format for cleaner JSON output
+    countries_list = []
+    for name, data in countries_data.items():
+        country_record = {NAME: name}
+        country_record.update({k: v for k, v in data.items() if k != '_id'})
+        countries_list.append(country_record)
+
+    return json.dumps(countries_list, indent=indent)
+
+
+def export_to_csv(countries_data: dict = None) -> str:
+    """
+    Export countries data to CSV format.
+
+    Args:
+        countries_data: Dictionary of countries to export.
+                        If None, exports all countries.
+
+    Returns:
+        CSV string representation of the countries data
+    """
+    if countries_data is None:
+        countries_data = read()
+
+    if not countries_data:
+        return ""
+
+    # Determine all possible fields from the data
+    all_fields = set()
+    for data in countries_data.values():
+        all_fields.update(data.keys())
+
+    # Remove MongoDB _id field and ensure NAME is first
+    all_fields.discard('_id')
+    all_fields.discard(NAME)
+    fieldnames = [NAME] + sorted(all_fields)
+
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output, fieldnames=fieldnames, extrasaction='ignore'
+    )
+    writer.writeheader()
+
+    for name, data in countries_data.items():
+        row = {NAME: name}
+        row.update({k: v for k, v in data.items() if k != '_id'})
+        writer.writerow(row)
+
+    return output.getvalue()

@@ -47,11 +47,13 @@ Returns cities in Massachusetts with "spring" in their name.
   "cities": {
     "New York": {
       "name": "New York",
-      "state_code": "NY"
+      "state_code": "NY",
+      "review_count": 0
     },
     "New Orleans": {
       "name": "New Orleans",
-      "state_code": "LA"
+      "state_code": "LA",
+      "review_count": 0
     }
   },
   "count": 2

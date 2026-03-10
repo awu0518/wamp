@@ -1,6 +1,9 @@
 """
 This file deals with our city-level data.
 """
+import csv
+import io
+import json
 from random import randint
 import time
 import data.db_connect as dbc
@@ -119,6 +122,7 @@ def read_paginated(page: int = 1,
 
 
 def create(flds: dict) -> str:
+    """Create a new city."""
     # Validate input
     validation.validate_required_fields(flds, [NAME, STATE_CODE])
 
@@ -139,10 +143,11 @@ def create(flds: dict) -> str:
     }
 
     new_id = dbc.create(CITY_COLLECTION, create_doc)
-    # Invalidate cache entry if it exists (unlikely but possible)
-    city_name = flds.get(NAME)
-    if city_name:
-        _invalidate_cache_entry(city_name)
+
+    # Update cache
+    if NAME in create_doc:
+        _cache_city(create_doc[NAME], create_doc)
+
     return str(new_id.inserted_id)
 
 
@@ -423,3 +428,69 @@ def bulk_delete(deletes: list) -> dict:
             })
 
     return results
+
+
+def export_to_json(cities_data: dict = None, indent: int = 2) -> str:
+    """
+    Export cities data to JSON format.
+
+    Args:
+        cities_data: Dictionary of cities to export.
+                     If None, exports all cities.
+        indent: Number of spaces for JSON indentation (default 2)
+
+    Returns:
+        JSON string representation of the cities data
+    """
+    if cities_data is None:
+        cities_data = read()
+
+    # Convert to list format for cleaner JSON output
+    cities_list = []
+    for name, data in cities_data.items():
+        city_record = {NAME: name}
+        city_record.update({k: v for k, v in data.items() if k != '_id'})
+        cities_list.append(city_record)
+
+    return json.dumps(cities_list, indent=indent)
+
+
+def export_to_csv(cities_data: dict = None) -> str:
+    """
+    Export cities data to CSV format.
+
+    Args:
+        cities_data: Dictionary of cities to export.
+                     If None, exports all cities.
+
+    Returns:
+        CSV string representation of the cities data
+    """
+    if cities_data is None:
+        cities_data = read()
+
+    if not cities_data:
+        return ""
+
+    # Determine all possible fields from the data
+    all_fields = set()
+    for data in cities_data.values():
+        all_fields.update(data.keys())
+
+    # Remove MongoDB _id field and ensure NAME is first
+    all_fields.discard('_id')
+    all_fields.discard(NAME)
+    fieldnames = [NAME] + sorted(all_fields)
+
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output, fieldnames=fieldnames, extrasaction='ignore'
+    )
+    writer.writeheader()
+
+    for name, data in cities_data.items():
+        row = {NAME: name}
+        row.update({k: v for k, v in data.items() if k != '_id'})
+        writer.writerow(row)
+
+    return output.getvalue()
