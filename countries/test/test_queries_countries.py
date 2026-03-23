@@ -62,6 +62,28 @@ def test_create_multiple(clear_country_cache):
     assert cq.num_countries() == 2
 
 
+def test_create_raises_on_duplicate_iso(clear_country_cache):
+    cq.create({cq.NAME: "Freedonia", cq.ISO_CODE: "FD"})
+    with pytest.raises(ValueError, match="iso_code already exists"):
+        cq.create({cq.NAME: "Other Freedonia", cq.ISO_CODE: "FD"})
+
+
+def test_create_normalizes_iso_to_uppercase(clear_country_cache):
+    cid = cq.create({cq.NAME: "Lowercase Land", cq.ISO_CODE: "ll"})
+    country = cq.read_one(cid)
+    assert country[cq.ISO_CODE] == "LL"
+
+
+def test_find_by_iso_code_case_insensitive(temp_country):
+    found = cq.find_by_iso_code("fd")
+    assert found is not None
+    assert found[cq.NAME] == "Freedonia"
+
+
+def test_find_by_iso_code_none_on_blank(clear_country_cache):
+    assert cq.find_by_iso_code("   ") is None
+
+
 # WITH RAISES: invalid inputs
 def test_create_raises_on_bad_type(clear_country_cache):
     with pytest.raises(ValueError, match="Request body must be a JSON object"):
@@ -110,6 +132,17 @@ def test_update_country_success(temp_country):
     assert updated_country[cq.NAME] == "New Freedonia"
     # ISO_CODE should remain unchanged
     assert updated_country[cq.ISO_CODE] == "FD"
+
+
+def test_update_country_rejects_duplicate_iso(clear_country_cache):
+    id1 = cq.create({cq.NAME: "Freedonia", cq.ISO_CODE: "FD"})
+    id2 = cq.create({cq.NAME: "Sylvania", cq.ISO_CODE: "SY"})
+    with pytest.raises(ValueError, match="iso_code already exists"):
+        cq.update(id2, {cq.ISO_CODE: "FD"})
+
+    # Ensure original values unchanged after failed update
+    assert cq.read_one(id1)[cq.ISO_CODE] == "FD"
+    assert cq.read_one(id2)[cq.ISO_CODE] == "SY"
 
 
 def test_update_country_raises_on_missing(clear_country_cache):
