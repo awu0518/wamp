@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from pymongo.errors import ServerSelectionTimeoutError, PyMongoError
 from functools import wraps
-from typing import Callable, TypeVar, Any
+from typing import Callable, TypeVar, Any, Optional
 from bson import ObjectId
 
 LOCAL = "0"
@@ -45,7 +45,7 @@ def require_connection(func: F) -> F:
     return wrapper  # type: ignore[return-value]
 
 
-def _build_mongo_uri() -> str | None:
+def _build_mongo_uri() -> Optional[str]:
     """
     Build a MongoDB connection URI from environment variables if provided.
     Priority:
@@ -90,7 +90,7 @@ def connect_db():
         timeout_ms = int(os.environ.get('MONGO_TIMEOUT_MS', '2000'))
 
         uri = _build_mongo_uri()
-        last_error: Exception | None = None
+        last_error: Optional[Exception] = None
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -229,9 +229,9 @@ def read(collection, db=SE_DB, no_id=True) -> list:
 def find_paginated(
     collection: str,
     db: str = SE_DB,
-    filt: dict | None = None,
-    projection: dict | None = None,
-    sort: list[tuple[str, int]] | None = None,
+    filt: Optional[dict] = None,
+    projection: Optional[dict] = None,
+    sort: Optional[list[tuple[str, int]]] = None,
     page: int = 1,
     limit: int = 50,
     no_id: bool = True

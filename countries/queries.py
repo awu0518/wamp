@@ -17,6 +17,9 @@ NAME = 'name'
 ISO_CODE = 'iso_code'
 REVIEW_COUNT = 'review_count'
 
+COUNTRY_ISO_UNIQUE_INDEX = 'countries_iso_code_unique_idx'
+_indexes_initialized = False
+
 # In-memory cache for testing
 country_cache = {}
 _next_id = 1
@@ -26,6 +29,63 @@ SAMPLE_COUNTRY = {
     ISO_CODE: 'US',
     REVIEW_COUNT: 0,
 }
+
+
+def _normalize_iso_code(value: str) -> str:
+    """Normalize and validate ISO code to a canonical uppercase form."""
+    if not isinstance(value, str):
+        raise ValueError('iso_code must be a string')
+    normalized = value.strip().upper()
+    validation.validate_iso_code(normalized, 'iso_code')
+    return normalized
+
+
+def _stable_country_sort_key(item: tuple[str, dict]) -> tuple[str, str]:
+    """Deterministic order for lookup stability across cache and DB results."""
+    rec_key, rec = item
+    name = rec.get(NAME, rec_key)
+    name_key = str(name).strip().lower() if name is not None else ''
+    rec_key_norm = str(rec_key).strip().lower()
+    return (name_key, rec_key_norm)
+
+
+def _ensure_indexes() -> None:
+    """Best-effort unique index on iso_code for DB-backed deployments."""
+    global _indexes_initialized
+    if _indexes_initialized:
+        return
+
+    try:
+        client = dbc.get_client()
+        client[dbc.SE_DB][COUNTRY_COLLECTION].create_index(
+            [(ISO_CODE, 1)],
+            name=COUNTRY_ISO_UNIQUE_INDEX,
+            unique=True,
+            background=True,
+        )
+    except Exception:
+        # Keep this non-fatal for test/local modes that don't use Mongo.
+        pass
+
+    _indexes_initialized = True
+
+
+def _find_iso_matches(
+    iso_code: str,
+    use_cache_only: bool = False,
+) -> list[tuple[str, dict]]:
+    """Return all records matching ISO code, sorted deterministically."""
+    target = _normalize_iso_code(iso_code)
+    countries = dict(country_cache) if use_cache_only else read()
+    matches = []
+
+    for rec_key, rec in countries.items():
+        code = rec.get(ISO_CODE)
+        if isinstance(code, str) and code.strip().upper() == target:
+            matches.append((rec_key, rec))
+
+    matches.sort(key=_stable_country_sort_key)
+    return matches
 
 
 # db connection placeholder
@@ -57,12 +117,16 @@ def read() -> dict:
         return dict(country_cache)
     # Otherwise, read from database
     try:
+        _ensure_indexes()
         countries = dbc.read_dict(COUNTRY_COLLECTION, key=NAME)
         # Add metadata to each country
         for name, country in countries.items():
             if REVIEW_COUNT not in country:
                 country[REVIEW_COUNT] = 0
-        return countries
+            if ISO_CODE in country and isinstance(country[ISO_CODE], str):
+                country[ISO_CODE] = country[ISO_CODE].strip().upper()
+        # Deterministic dictionary ordering for stable iteration behavior.
+        return dict(sorted(countries.items(), key=_stable_country_sort_key))
     except Exception:
         return {}
 
@@ -100,14 +164,11 @@ def find_by_iso_code(iso_code: str) -> Optional[dict]:
     Find a country by its ISO code (case-insensitive).
     Returns a copy of the country data if found, otherwise None.
     """
-    if not isinstance(iso_code, str) or not iso_code:
+    if not isinstance(iso_code, str) or not iso_code.strip():
         return None
-    target = iso_code.strip().lower()
-    countries = read()
-    for rec in countries.values():
-        code = rec.get(ISO_CODE)
-        if isinstance(code, str) and code.lower() == target:
-            return dict(rec)
+    matches = _find_iso_matches(iso_code)
+    if matches:
+        return dict(matches[0][1])
     return None
 
 
@@ -123,14 +184,21 @@ def create(flds: dict) -> str:
     validation.validate_string_length(flds[NAME], 'name',
                                       min_length=1, max_length=100)
 
-    # Validate ISO code format (2-3 uppercase letters)
-    validation.validate_iso_code(flds[ISO_CODE], 'iso_code')
+    normalized_iso = _normalize_iso_code(flds[ISO_CODE])
+
+    # Enforce ISO uniqueness against the same in-memory store used by create.
+    if _find_iso_matches(normalized_iso, use_cache_only=True):
+        raise ValueError(
+            f'Country with iso_code already exists: {normalized_iso}'
+        )
 
     create_doc = {
-        NAME: flds[NAME],
-        ISO_CODE: flds[ISO_CODE],
+        NAME: flds[NAME].strip(),
+        ISO_CODE: normalized_iso,
         REVIEW_COUNT: 0,
     }
+
+    _ensure_indexes()
 
     # Use cache for testing
     new_id = str(_next_id)
@@ -223,21 +291,45 @@ def update(country_id: str, flds: dict) -> bool:
         validation.validate_string_length(flds[NAME], 'name',
                                           min_length=1, max_length=100)
 
+    normalized_iso = None
     # Validate ISO code if present
     if ISO_CODE in flds:
-        validation.validate_iso_code(flds[ISO_CODE], 'iso_code')
+        normalized_iso = _normalize_iso_code(flds[ISO_CODE])
 
     countries = read()
     if country_id not in countries:
         raise ValueError(f'No such country: {country_id}')
 
+    current = countries[country_id]
+    current_iso = str(current.get(ISO_CODE, '')).strip().upper()
+
+    # Enforce uniqueness if ISO is changing.
+    if normalized_iso and normalized_iso != current_iso:
+        existing = _find_iso_matches(
+            normalized_iso,
+            use_cache_only=(country_id in country_cache),
+        )
+        conflict = any(match_key != country_id for match_key, _ in existing)
+        if conflict:
+            raise ValueError(
+                f'Country with iso_code already exists: {normalized_iso}'
+            )
+
+    update_doc = dict(flds)
+    if NAME in update_doc and isinstance(update_doc[NAME], str):
+        update_doc[NAME] = update_doc[NAME].strip()
+    if normalized_iso:
+        update_doc[ISO_CODE] = normalized_iso
+
+    _ensure_indexes()
+
     # Update cache if present
     if country_id in country_cache:
-        country_cache[country_id].update(flds)
+        country_cache[country_id].update(update_doc)
         return True
 
     # Otherwise update database
-    dbc.update(COUNTRY_COLLECTION, {NAME: country_id}, flds)
+    dbc.update(COUNTRY_COLLECTION, {NAME: country_id}, update_doc)
     return True
 
 
@@ -254,6 +346,13 @@ def search(name: str = None, iso_code: str = None) -> dict:
     """
     countries = read()
     results = {}
+    normalized_iso = None
+    if iso_code is not None:
+        try:
+            normalized_iso = _normalize_iso_code(iso_code)
+        except Exception:
+            # Search should return empty results for invalid iso filters.
+            return {}
 
     for country_name, country_data in countries.items():
         match = True
@@ -262,8 +361,11 @@ def search(name: str = None, iso_code: str = None) -> dict:
                 country_data.get(NAME, '').lower():
             match = False
 
-        if iso_code and country_data.get(ISO_CODE, '').lower() != \
-                iso_code.lower():
+        if (
+            normalized_iso
+            and str(country_data.get(ISO_CODE, '')).strip().upper()
+            != normalized_iso
+        ):
             match = False
 
         if match:

@@ -1,6 +1,56 @@
 """
 This file deals with journal entry data.
 All journal interactions with MongoDB should be through this file.
+
+Canonical Location Identity Spec
+===============================
+
+Purpose
+-------
+Journal entries are authored for a city, but reporting and counters can roll up
+to state/region and country. To keep this deterministic across API layers,
+location fields should follow one canonical identity shape.
+
+Canonical key shape
+-------------------
+City + StateOrRegion + CountryISO
+
+Represented by these fields in a journal document:
+- location_name: city display name (required)
+- state_code: state/region code (optional)
+- iso_code: ISO 3166-1 alpha-2 country code (required for canonical identity)
+
+Logical canonical key string (for docs/debugging/tests):
+    <CITY_NORM>|<STATE_OR_REGION_NORM>|<COUNTRY_ISO_NORM>
+
+Normalization rules
+-------------------
+1) City
+     - Trim leading/trailing whitespace.
+     - Collapse internal runs of whitespace to a single space.
+     - Case-insensitive for matching (store/display value may preserve case).
+
+2) State/Region
+     - Optional.
+     - Trim whitespace.
+     - Uppercase if alphabetic.
+     - Empty/None normalizes to the sentinel '__NONE__' when building the
+         logical canonical key.
+
+3) Country ISO
+     - Required for canonical identity.
+     - Trim whitespace.
+     - Uppercase (expected alpha-2).
+
+4) Equality
+     - Two locations are identical only if all three normalized key parts
+         match, including the state/region sentinel when omitted.
+
+Notes
+-----
+- This section is intentionally documentation-first. Runtime enforcement and
+    migration of existing records can be added incrementally in follow-up
+    commits.
 """
 from datetime import datetime
 from typing import Optional
@@ -24,6 +74,13 @@ LNG = 'lng'
 VISITED_AT = 'visited_at'
 CREATED_AT = 'created_at'
 UPDATED_AT = 'updated_at'
+
+# Canonical location identity fields for cross-layer consistency.
+# See module-level "Canonical Location Identity Spec" for normalization rules.
+CANONICAL_CITY_FIELD = LOCATION_NAME
+CANONICAL_STATE_OR_REGION_FIELD = STATE_CODE
+CANONICAL_COUNTRY_ISO_FIELD = ISO_CODE
+CANONICAL_STATE_NONE_SENTINEL = '__NONE__'
 
 VALID_LOCATION_TYPES = ['country', 'state', 'city']
 REQUIRED_FIELDS = [TITLE, LOCATION_TYPE, LOCATION_NAME]
