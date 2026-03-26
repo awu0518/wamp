@@ -1299,6 +1299,7 @@ class JournalById(Resource):
         except Exception as e:
             return {'error': str(e)}, 500
 
+
 @api.route(LEADERBOARD_EP)
 class Leaderboard(Resource):
     @api.response(200, 'Success')
