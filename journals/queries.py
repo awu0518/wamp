@@ -284,3 +284,70 @@ def count_by_user(user_id: str) -> int:
     return client[dbc.SE_DB][JOURNAL_COLLECTION].count_documents(
         {USER_ID: user_id}
     )
+
+
+@dbc.require_connection
+def get_leaderboard():
+    db = dbc.get_db()
+    journals = db['journals']
+    users = db['users']
+
+    # rank users by journal count
+    rankings_pipeline = [
+        {
+            '$group': {
+                '_id': '$user_id',
+                'placesVisited': {'$sum': 1}
+            }
+        },
+        {'$sort': {'placesVisited': -1}}
+    ]
+
+    rankings_raw = list(journals.aggregate(rankings_pipeline))
+
+    rankings = []
+    for row in rankings_raw:
+        user_id = row['_id']
+        user = None
+
+        try:
+            user = users.find_one({'_id': ObjectId(user_id)})
+        except Exception:
+            user = users.find_one({'_id': user_id})
+
+        rankings.append({
+            'user_id': str(user_id),
+            'username': user.get('username', 'Unknown') if user else 'Unknown',
+            'placesVisited': row['placesVisited']
+        })
+    # popular destinations
+    destinations_pipeline = [
+        {
+            '$group': {
+                '_id': {
+                    'location_name': '$location_name',
+                    'state_code': '$state_code',
+                    'iso_code': '$iso_code',
+                },
+                'count': {'$sum': 1}
+            }
+        },
+        {'$sort': {'count': -1}}
+    ]
+
+    destinations_raw = list(journals.aggregate(destinations_pipeline))
+
+    popular_destinations = [
+        {
+            'name': row['_id'].get('location_name', ''),
+            'state_code': row['_id'].get('state_code', ''),
+            'iso_code': row['_id'].get('iso_code', ''),
+            'count': row['count']
+        }
+        for row in destinations_raw
+    ]
+
+    return {
+        'rankings': rankings,
+        'popularDestinations': popular_destinations
+    }

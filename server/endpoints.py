@@ -59,6 +59,8 @@ STATES_RESP = 'states'
 STATES_SEARCH_EP = '/states/search'
 JOURNALS_EP = '/journals'
 JOURNALS_RESP = 'journals'
+LEADERBOARD_EP = '/leaderboard'
+LEADERBOARD_RESP = 'rankings'
 
 # Swagger Models for Documentation
 city_model = api.model('City', {
@@ -1294,6 +1296,20 @@ class JournalById(Resource):
             return {MESSAGE: 'Journal deleted successfully'}
         except ValueError as e:
             return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+@api.route(LEADERBOARD_EP)
+class Leaderboard(Resource):
+    @api.response(200, 'Success')
+    @api.response(500, 'Internal Server Error', error_response)
+    def get(self):
+        """
+        Return leaderboard rankings and most popular destinations.
+        """
+        try:
+            data = jq.get_leaderboard()
+            return data
         except Exception as e:
             return {'error': str(e)}, 500
 
