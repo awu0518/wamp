@@ -1310,10 +1310,10 @@ class Leaderboard(Resource):
         Most Popular destination still needs more implementation
         """
         try:
-            data = jq.get_leaderboard()
-            return data
+            return jq.get_leaderboard(), 200
         except Exception as e:
-            return {'error': str(e)}, 500
+            print("LEADERBOARD ERROR:", repr(e))
+            return {'error': repr(e)}, 500
 
 
 if __name__ == '__main__':

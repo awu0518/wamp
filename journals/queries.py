@@ -292,7 +292,6 @@ def get_leaderboard():
     journals = db['journals']
     users = db['users']
 
-    # rank users by journal count
     rankings_pipeline = [
         {
             '$group': {
@@ -317,18 +316,14 @@ def get_leaderboard():
 
         rankings.append({
             'user_id': str(user_id),
-            'username': user.get('username', 'Unknown') if user else 'Unknown',
-            'placesVisited': row['placesVisited']
+            'username': user['username'] if user and 'username' in user else 'Unknown',
+            'placesVisited': row.get('placesVisited', 0)
         })
-    # popular destinations
+
     destinations_pipeline = [
         {
             '$group': {
-                '_id': {
-                    'location_name': '$location_name',
-                    'state_code': '$state_code',
-                    'iso_code': '$iso_code',
-                },
+                '_id': '$location_name',
                 'count': {'$sum': 1}
             }
         },
@@ -339,10 +334,8 @@ def get_leaderboard():
 
     popular_destinations = [
         {
-            'name': row['_id'].get('location_name', ''),
-            'state_code': row['_id'].get('state_code', ''),
-            'iso_code': row['_id'].get('iso_code', ''),
-            'count': row['count']
+            'name': row.get('_id', ''),
+            'count': row.get('count', 0)
         }
         for row in destinations_raw
     ]
