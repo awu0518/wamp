@@ -316,7 +316,11 @@ def get_leaderboard():
 
         rankings.append({
             'user_id': str(user_id),
-            'username': user['username'] if user and 'username' in user else 'Unknown',
+            'username': (
+                user['username']
+                if user and 'username' in user
+                else 'Unknown'
+            ),
             'placesVisited': row.get('placesVisited', 0)
         })
 
