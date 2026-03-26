@@ -1307,6 +1307,7 @@ class Leaderboard(Resource):
     def get(self):
         """
         Return leaderboard rankings and most popular destinations.
+        Most Popular destination still needs more implementation
         """
         try:
             data = jq.get_leaderboard()
