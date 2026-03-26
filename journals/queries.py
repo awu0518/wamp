@@ -288,9 +288,9 @@ def count_by_user(user_id: str) -> int:
 
 @dbc.require_connection
 def get_leaderboard():
-    db = dbc.get_db()
-    journals = db['journals']
-    users = db['users']
+    client = dbc.get_client()
+    journals = client[dbc.SE_DB]['journals']
+    users = client[dbc.SE_DB]['users']
 
     rankings_pipeline = [
         {
