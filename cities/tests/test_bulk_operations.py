@@ -110,3 +110,15 @@ def test_bulk_delete_with_failures(clear_city_cache):
 def test_bulk_delete_invalid_input(clear_city_cache):
     with pytest.raises(ValueError, match="Deletes must be a list"):
         cq.bulk_delete({"not": "a list"})
+
+
+def test_bulk_delete_country_iso_fallback(clear_city_cache):
+    deletes = [
+        {"name": "Tokyo", "country_iso_code": "JP"},
+        {"name": "Berlin", "country_iso_code": "DE"},
+    ]
+    with patch.object(cq, "delete", return_value=True):
+        result = cq.bulk_delete(deletes)
+    assert result["success"] == 2
+    assert result["failed"] == 0
+    assert result["errors"] == []

@@ -94,6 +94,28 @@ def test_create_multiple_cities(clear_city_cache):
     cq.delete(city1[cq.NAME], city1[cq.STATE_CODE])
     cq.delete(city2[cq.NAME], city2[cq.STATE_CODE])
 
+
+def test_create_with_country_fallback_only(clear_city_cache):
+    """City create supports country-only linkage when no state data exists."""
+    test_city = {
+        cq.NAME: f"TestCountryOnly_{int(time.time())}",
+        cq.COUNTRY_ISO_CODE: "jp",
+    }
+
+    result = cq.create(test_city)
+    assert result is not None
+    cities = cq.read()
+    assert test_city[cq.NAME] in cities
+    assert cities[test_city[cq.NAME]][cq.COUNTRY_ISO_CODE] == "JP"
+    assert cq.STATE_CODE not in cities[test_city[cq.NAME]]
+
+    cq.delete(test_city[cq.NAME], country_iso_code="JP")
+
+
+def test_create_requires_state_or_country(clear_city_cache):
+    with pytest.raises(ValueError, match="At least one of state_code"):
+        cq.create({cq.NAME: f"BadCity_{int(time.time())}"})
+
 @patch('cities.queries.db_connect', return_value=True, autospec=True)
 def test_delete(mock_db_connect, clear_city_cache):
     # Create a test city first
@@ -152,6 +174,18 @@ def test_update_city_success(temp_city):
     assert updated_city[cq.STATE_CODE] == "MA"
 
 
+def test_update_city_country_iso_code(clear_city_cache):
+    """Updating city can add country_iso_code for disambiguation."""
+    city_name = f"UpdateCountry_{int(time.time())}"
+    cq.create({cq.NAME: city_name, cq.STATE_CODE: "UC"})
+
+    assert cq.update(city_name, {cq.COUNTRY_ISO_CODE: "us"}) is True
+    updated = cq.read_one(city_name)
+    assert updated[cq.COUNTRY_ISO_CODE] == "US"
+
+    cq.delete(city_name, state_code="UC", country_iso_code="US")
+
+
 def test_update_city_raises_on_missing(clear_city_cache):
     """Test update raises error for non-existent city"""
     with pytest.raises(ValueError, match="No such city"):
@@ -183,6 +217,19 @@ def test_read(temp_city):
     # Check that our temp city is in the results
     assert temp_city in cities
     assert cities[temp_city][cq.NAME] == "Boston"
+
+
+def test_search_by_country_iso_code(clear_city_cache):
+    city_name = f"SearchCountry_{int(time.time())}"
+    cq.create({
+        cq.NAME: city_name,
+        cq.COUNTRY_ISO_CODE: "de",
+    })
+
+    results = cq.search(country_iso_code="DE")
+    assert city_name in results
+
+    cq.delete(city_name, country_iso_code="DE")
 
 @pytest.mark.skip('revive once all functions are cutover!')
 def test_read_cant_connect():

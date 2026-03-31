@@ -15,6 +15,7 @@ CITY_COLLECTION = 'cities'
 ID = 'id'
 NAME = 'name'
 STATE_CODE = 'state_code'
+COUNTRY_ISO_CODE = 'country_iso_code'
 REVIEW_COUNT = 'review_count'
 
 # Cache configuration
@@ -25,8 +26,21 @@ city_cache = {}  # {city_name: {'data': city_data, 'timestamp': time}}
 SAMPLE_CITY = {
     NAME: 'New York',
     STATE_CODE: 'NY',
+    COUNTRY_ISO_CODE: 'US',
     REVIEW_COUNT: 0,
 }
+
+
+def _normalize_state_code(state_code: str) -> str:
+    code = state_code.strip().upper()
+    validation.validate_state_code(code, STATE_CODE)
+    return code
+
+
+def _normalize_country_iso_code(country_iso_code: str) -> str:
+    code = country_iso_code.strip().upper()
+    validation.validate_iso_code(code, COUNTRY_ISO_CODE)
+    return code
 
 
 # db connection placeholder
@@ -124,23 +138,45 @@ def read_paginated(page: int = 1,
 def create(flds: dict) -> str:
     """Create a new city."""
     # Validate input
-    validation.validate_required_fields(flds, [NAME, STATE_CODE])
+    validation.validate_required_fields(flds, [NAME])
 
     # Validate no extra fields
-    validation.validate_no_extra_fields(flds, [NAME, STATE_CODE])
+    validation.validate_no_extra_fields(
+        flds,
+        [NAME, STATE_CODE, COUNTRY_ISO_CODE]
+    )
 
     # Validate name
     validation.validate_string_length(flds[NAME], 'name',
                                       min_length=1, max_length=100)
 
-    # Validate state code format (2 uppercase letters)
-    validation.validate_state_code(flds[STATE_CODE], 'state_code')
+    state_code = flds.get(STATE_CODE)
+    country_iso_code = flds.get(COUNTRY_ISO_CODE)
+
+    # Allow countries that do not have state-level data.
+    if not state_code and not country_iso_code:
+        raise ValueError(
+            'At least one of state_code or country_iso_code is required'
+        )
+
+    normalized_state_code = None
+    if state_code is not None:
+        normalized_state_code = _normalize_state_code(state_code)
+
+    normalized_country_iso_code = None
+    if country_iso_code is not None:
+        normalized_country_iso_code = _normalize_country_iso_code(
+            country_iso_code
+        )
 
     create_doc = {
-        NAME: flds[NAME],
-        STATE_CODE: flds[STATE_CODE],
+        NAME: flds[NAME].strip(),
         REVIEW_COUNT: 0,
     }
+    if normalized_state_code is not None:
+        create_doc[STATE_CODE] = normalized_state_code
+    if normalized_country_iso_code is not None:
+        create_doc[COUNTRY_ISO_CODE] = normalized_country_iso_code
 
     new_id = dbc.create(CITY_COLLECTION, create_doc)
 
@@ -151,16 +187,30 @@ def create(flds: dict) -> str:
     return str(new_id.inserted_id)
 
 
-def delete(name: str, state_code: str) -> bool:
-    ret = dbc.delete(CITY_COLLECTION, {NAME: name, STATE_CODE: state_code})
+def delete(name: str,
+           state_code: str = None,
+           country_iso_code: str = None) -> bool:
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError('name must be a non-empty string')
+    if not state_code and not country_iso_code:
+        raise ValueError('Either state_code or country_iso_code is required')
+
+    filt = {NAME: name.strip()}
+    if state_code:
+        filt[STATE_CODE] = _normalize_state_code(state_code)
+    if country_iso_code:
+        filt[COUNTRY_ISO_CODE] = _normalize_country_iso_code(country_iso_code)
+
+    ret = dbc.delete(CITY_COLLECTION, filt)
     if ret < 1:
-        raise ValueError(f'City not found: {name}, {state_code}')
+        raise ValueError('City not found')
     # Invalidate cache entry
-    _invalidate_cache_entry(name)
+    _invalidate_cache_entry(name.strip())
     return ret
 
 
-def increment_review_count(city_name: str, state_code: str,
+def increment_review_count(city_name: str, state_code: str = None,
+                           country_iso_code: str = None,
                            increment_by: int = 1) -> bool:
     """
     Increment review_count for a city identified by name and state_code.
@@ -168,6 +218,7 @@ def increment_review_count(city_name: str, state_code: str,
     Args:
         city_name: City name key
         state_code: Two-letter state code
+        country_iso_code: Country ISO code when state_code is unavailable
         increment_by: Positive increment amount (default 1)
 
     Returns:
@@ -175,17 +226,34 @@ def increment_review_count(city_name: str, state_code: str,
     """
     if not isinstance(city_name, str) or not city_name.strip():
         raise ValueError('city_name must be a non-empty string')
-    validation.validate_state_code(state_code, 'state_code')
+    if not state_code and not country_iso_code:
+        raise ValueError('Either state_code or country_iso_code is required')
     if not isinstance(increment_by, int) or increment_by < 1:
         raise ValueError('increment_by must be a positive integer')
 
     normalized_name = city_name.strip()
-    normalized_state_code = state_code.strip().upper()
-    query_filter = {NAME: normalized_name, STATE_CODE: normalized_state_code}
+    query_filter = {NAME: normalized_name}
+    normalized_state_code = None
+    if state_code:
+        normalized_state_code = _normalize_state_code(state_code)
+        query_filter[STATE_CODE] = normalized_state_code
+    if country_iso_code:
+        query_filter[COUNTRY_ISO_CODE] = _normalize_country_iso_code(
+            country_iso_code
+        )
 
     if normalized_name in city_cache:
         cache_data = city_cache[normalized_name].get('data', {})
-        if cache_data.get(STATE_CODE) == normalized_state_code:
+        state_matches = (
+            normalized_state_code is None
+            or cache_data.get(STATE_CODE) == normalized_state_code
+        )
+        country_matches = (
+            country_iso_code is None
+            or cache_data.get(COUNTRY_ISO_CODE)
+            == query_filter.get(COUNTRY_ISO_CODE)
+        )
+        if state_matches and country_matches:
             current_count = cache_data.get(REVIEW_COUNT, 0)
             cache_data[REVIEW_COUNT] = current_count + increment_by
             city_cache[normalized_name]['timestamp'] = time.time()
@@ -197,9 +265,7 @@ def increment_review_count(city_name: str, state_code: str,
             {'$inc': {REVIEW_COUNT: increment_by}}
         )
         if result.matched_count < 1:
-            raise ValueError(
-                f'City not found: {normalized_name}, {normalized_state_code}'
-            )
+            raise ValueError('City not found')
     except Exception:
         raise
 
@@ -233,7 +299,10 @@ def update(city_id: str, flds: dict) -> bool:
         raise ValueError(f'Bad type for {type(flds)=}')
 
     # Validate no extra fields
-    validation.validate_no_extra_fields(flds, [NAME, STATE_CODE])
+    validation.validate_no_extra_fields(
+        flds,
+        [NAME, STATE_CODE, COUNTRY_ISO_CODE]
+    )
 
     # Validate name if present
     if NAME in flds:
@@ -242,7 +311,12 @@ def update(city_id: str, flds: dict) -> bool:
 
     # Validate state code if present
     if STATE_CODE in flds:
-        validation.validate_state_code(flds[STATE_CODE], 'state_code')
+        flds[STATE_CODE] = _normalize_state_code(flds[STATE_CODE])
+
+    if COUNTRY_ISO_CODE in flds:
+        flds[COUNTRY_ISO_CODE] = _normalize_country_iso_code(
+            flds[COUNTRY_ISO_CODE]
+        )
 
     cities = read()
     if city_id not in cities:
@@ -252,35 +326,68 @@ def update(city_id: str, flds: dict) -> bool:
         # Delete old record and create new one with updated name
         old_city = cities[city_id].copy()
         old_city.update(flds)
+        if not old_city.get(STATE_CODE) and not old_city.get(COUNTRY_ISO_CODE):
+            raise ValueError(
+                'At least one of state_code or country_iso_code is required'
+            )
         # Remove metadata fields before creating
         old_city.pop(REVIEW_COUNT, None)
-        delete(city_id, old_city.get(STATE_CODE, ''))
+        delete(
+            city_id,
+            old_city.get(STATE_CODE),
+            old_city.get(COUNTRY_ISO_CODE)
+        )
         create(old_city)
         _invalidate_cache_entry(city_id)
     else:
+        merged = dict(cities[city_id])
+        merged.update(flds)
+        if not merged.get(STATE_CODE) and not merged.get(COUNTRY_ISO_CODE):
+            raise ValueError(
+                'At least one of state_code or country_iso_code is required'
+            )
         # Regular update
         dbc.update(CITY_COLLECTION, {NAME: city_id}, flds)
         _invalidate_cache_entry(city_id)
     return True
 
 
-def search(name: str = None, state_code: str = None) -> dict:
+def search(name: str = None,
+           state_code: str = None,
+           country_iso_code: str = None) -> dict:
     """
-    Search cities by name and/or state_code (case-insensitive).
+    Search cities by name and location codes (case-insensitive).
     Args:
         name: City name substring to search for
         state_code: State code to filter by
+        country_iso_code: Country ISO code to filter by
     Returns:
         Dictionary of matching cities
     """
+    normalized_state_code = None
+    if state_code:
+        normalized_state_code = _normalize_state_code(state_code)
+
+    normalized_country_iso = None
+    if country_iso_code:
+        normalized_country_iso = _normalize_country_iso_code(country_iso_code)
+
     cities = read()
     results = {}
     for city_name, city_data in cities.items():
         match = True
         if name and name.lower() not in city_data.get(NAME, '').lower():
             match = False
-        cond = city_data.get(STATE_CODE, '').lower() != state_code.lower()
-        if state_code and cond:
+        if (
+            normalized_state_code
+            and city_data.get(STATE_CODE, '').upper() != normalized_state_code
+        ):
+            match = False
+        if (
+            normalized_country_iso
+            and city_data.get(COUNTRY_ISO_CODE, '').upper()
+            != normalized_country_iso
+        ):
             match = False
         if match:
             results[city_name] = city_data
@@ -408,22 +515,24 @@ def bulk_delete(deletes: list) -> dict:
 
         city_name = delete_item.get('name')
         state_code = delete_item.get('state_code')
+        country_iso_code = delete_item.get('country_iso_code')
 
-        if not city_name or not state_code:
+        if not city_name or (not state_code and not country_iso_code):
             results["failed"] += 1
             results["errors"].append({
                 "id": city_name or "unknown",
-                "error": "Delete item must have 'name' and 'state_code'"
+                "error": "Delete item must have 'name' and one of "
+                         "'state_code' or 'country_iso_code'"
             })
             continue
 
         try:
-            delete(city_name, state_code)
+            delete(city_name, state_code, country_iso_code)
             results["success"] += 1
         except (ValueError, validation.ValidationError) as e:
             results["failed"] += 1
             results["errors"].append({
-                "id": f"{city_name}, {state_code}",
+                "id": f"{city_name}, {state_code or country_iso_code}",
                 "error": str(e)
             })
 
