@@ -44,7 +44,8 @@ def temp_state():
     """Create a temporary state and yield its name (used as ID)"""
     flds = {
         sq.NAME: "TestState",
-        sq.STATE_CODE: "TS"
+        sq.STATE_CODE: "TS",
+        sq.COUNTRY_ISO_CODE: "US"
     }
     sq.create(flds)
     yield flds[sq.NAME]
@@ -60,7 +61,8 @@ def test_create_success():
     timestamp = int(time.time())
     test_state = {
         sq.NAME: f"TestState_{timestamp}",
-        sq.STATE_CODE: "TS"
+        sq.STATE_CODE: "TS",
+        sq.COUNTRY_ISO_CODE: "US"
     }
     
     result = sq.create(test_state)
@@ -80,8 +82,16 @@ def test_create_success():
 def test_create_multiple_states():
     """Test creating multiple states"""
     timestamp = int(time.time())
-    state1 = {sq.NAME: f"State1_{timestamp}", sq.STATE_CODE: "AA"}
-    state2 = {sq.NAME: f"State2_{timestamp}", sq.STATE_CODE: "BB"}
+    state1 = {
+        sq.NAME: f"State1_{timestamp}",
+        sq.STATE_CODE: "AA",
+        sq.COUNTRY_ISO_CODE: "US",
+    }
+    state2 = {
+        sq.NAME: f"State2_{timestamp}",
+        sq.STATE_CODE: "BB",
+        sq.COUNTRY_ISO_CODE: "CA",
+    }
     
     id1 = sq.create(state1)
     id2 = sq.create(state2)
@@ -126,6 +136,7 @@ def test_read_one_success(temp_state):
     state = sq.read_one(temp_state)
     assert state[sq.NAME] == "TestState"
     assert state[sq.STATE_CODE] == "TS"
+    assert state[sq.COUNTRY_ISO_CODE] == "US"
 
 
 def test_read_one_raises_on_missing():
@@ -171,7 +182,8 @@ def test_num_states():
     old_count = sq.num_states()
     unique_state = {
         sq.NAME: f"CountTest_{int(time.time())}",
-        sq.STATE_CODE: "CT"
+        sq.STATE_CODE: "CT",
+        sq.COUNTRY_ISO_CODE: "US"
     }
     sq.create(unique_state)
     new_count = sq.num_states()
@@ -185,6 +197,13 @@ def test_find_by_state_code(temp_state):
     assert state is not None
     assert state[sq.NAME] == "TestState"
     assert state[sq.STATE_CODE] == "TS"
+
+
+def test_find_by_country_iso_code(temp_state):
+    """Test find_by_country_iso_code function"""
+    results = sq.find_by_country_iso_code("us")
+    assert temp_state in results
+    assert results[temp_state][sq.COUNTRY_ISO_CODE] == "US"
 
 
 def test_find_by_state_code_case_insensitive(temp_state):
@@ -217,6 +236,13 @@ def test_search_by_state_code(temp_state):
 def test_search_combined(temp_state):
     """Test search function with multiple parameters"""
     results = sq.search(name="Test", state_code="TS")
+    assert len(results) >= 1
+    assert temp_state in results
+
+
+def test_search_by_country_iso_code(temp_state):
+    """Test search function with country_iso_code parameter"""
+    results = sq.search(country_iso_code="US")
     assert len(results) >= 1
     assert temp_state in results
 

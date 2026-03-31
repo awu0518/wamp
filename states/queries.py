@@ -16,6 +16,7 @@ STATE_COLLECTION = 'states'
 ID = 'id'
 NAME = 'name'
 STATE_CODE = 'state_code'
+COUNTRY_ISO_CODE = 'country_iso_code'
 ABBREVIATION = 'abbreviation'  # Alias for state_code
 REVIEW_COUNT = 'review_count'
 
@@ -25,6 +26,7 @@ CACHE_EXPIRY_SECONDS = 300  # 5 minutes
 SAMPLE_STATE = {
     NAME: 'New York',
     STATE_CODE: 'NY',
+    COUNTRY_ISO_CODE: 'US',
     REVIEW_COUNT: 0,
 }
 
@@ -123,13 +125,32 @@ def find_by_state_code(state_code: str) -> Optional[dict]:
     return None
 
 
+def find_by_country_iso_code(country_iso_code: str) -> dict:
+    """
+    Find all states for a given country ISO code (case-insensitive).
+    Returns a dict of states keyed by state name.
+    """
+    if not isinstance(country_iso_code, str) or not country_iso_code.strip():
+        return {}
+
+    target = country_iso_code.strip().upper()
+    states = read()
+    return {
+        state_name: state_data
+        for state_name, state_data in states.items()
+        if str(state_data.get(COUNTRY_ISO_CODE, '')).upper() == target
+    }
+
+
 def create(flds: dict) -> str:
     """Create a new state."""
     # Validate required fields
-    validation.validate_required_fields(flds, [NAME, STATE_CODE])
+    validation.validate_required_fields(flds, [NAME, STATE_CODE,
+                                               COUNTRY_ISO_CODE])
 
     # Validate no extra fields
-    validation.validate_no_extra_fields(flds, [NAME, STATE_CODE])
+    validation.validate_no_extra_fields(flds, [NAME, STATE_CODE,
+                                               COUNTRY_ISO_CODE])
 
     # Validate name
     validation.validate_string_length(flds[NAME], 'name',
@@ -137,10 +158,12 @@ def create(flds: dict) -> str:
 
     # Validate state code format (2 uppercase letters)
     validation.validate_state_code(flds[STATE_CODE], 'state_code')
+    validation.validate_iso_code(flds[COUNTRY_ISO_CODE], 'country_iso_code')
 
     create_doc = {
         NAME: flds[NAME],
         STATE_CODE: flds[STATE_CODE],
+        COUNTRY_ISO_CODE: flds[COUNTRY_ISO_CODE],
         REVIEW_COUNT: 0,
     }
 
@@ -226,7 +249,7 @@ def update(state_id: str, flds: dict) -> bool:
         raise ValueError(f'Bad type for {type(flds)=}')
 
     # Validate no extra fields
-    allowed = [NAME, STATE_CODE]
+    allowed = [NAME, STATE_CODE, COUNTRY_ISO_CODE]
     validation.validate_no_extra_fields(flds, allowed)
 
     # Validate name if present
@@ -237,6 +260,12 @@ def update(state_id: str, flds: dict) -> bool:
     # Validate state code if present
     if STATE_CODE in flds:
         validation.validate_state_code(flds[STATE_CODE], 'state_code')
+
+    if COUNTRY_ISO_CODE in flds:
+        validation.validate_iso_code(
+            flds[COUNTRY_ISO_CODE],
+            'country_iso_code'
+        )
 
     states = read()
     if state_id not in states:
@@ -260,13 +289,17 @@ def update(state_id: str, flds: dict) -> bool:
     return True
 
 
-def search(name: str = None, state_code: str = None) -> dict:
+def search(name: str = None,
+           state_code: str = None,
+           country_iso_code: str = None) -> dict:
     """
-    Search states by name and/or state_code (case-insensitive).
+    Search states by name and/or codes (case-insensitive).
 
     Args:
         name: State name substring to search for
         state_code: State code to filter by (exact match)
+        country_iso_code: Country ISO code to filter by (exact match)
+
     Returns:
         Dictionary of matching states
     """
@@ -282,6 +315,11 @@ def search(name: str = None, state_code: str = None) -> dict:
         if state_code:
             data_code = state_data.get(STATE_CODE, '').upper()
             if data_code != state_code.upper():
+                match = False
+
+        if country_iso_code:
+            data_country_code = state_data.get(COUNTRY_ISO_CODE, '').upper()
+            if data_country_code != country_iso_code.upper():
                 match = False
 
         if match:
