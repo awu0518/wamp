@@ -1193,9 +1193,17 @@ class Journals(Resource):
             data = jq.read_by_user(
                 user_id, location_type=loc_type,
                 page=page, limit=limit)
+            items = dbc.deep_convert_object_ids(data['items'])
+            for item in items:
+                jid = item.get('_id') or item.get('id')
+                item['links'] = {
+                    'self': f'/journals/{jid}',
+                    'update': f'/journals/{jid}',
+                    'delete': f'/journals/{jid}',
+                }
             return {
-                JOURNALS_RESP: dbc.deep_convert_object_ids(data['items']),
-                'count': len(data['items']),
+                JOURNALS_RESP: items,
+                'count': len(items),
                 'pagination': {
                     'page': data['page'],
                     'limit': data['limit'],
@@ -1204,6 +1212,14 @@ class Journals(Resource):
                     'has_next': data['has_next'],
                     'has_prev': data['has_prev'],
                 },
+                'links': {
+                    'self': f'/journals?page={page}&limit={limit}',
+                    'create': '/journals',
+                    'next': f'/journals?page={page + 1}&limit={limit}'
+                            if data['has_next'] else None,
+                    'prev': f'/journals?page={page - 1}&limit={limit}'
+                            if data['has_prev'] else None,
+                }
             }
         except ValueError as e:
             return {'error': str(e)}, 400
@@ -1251,9 +1267,15 @@ class JournalById(Resource):
         Get a single journal entry by ID.
         """
         try:
-            doc = jq.read_one(journal_id, user_id)
+            doc = dbc.deep_convert_object_ids(jq.read_one(journal_id, user_id))
+            doc['links'] = {
+                'self': f'/journals/{journal_id}',
+                'collection': '/journals',
+                'update': f'/journals/{journal_id}',
+                'delete': f'/journals/{journal_id}',
+            }
             return {
-                JOURNALS_RESP: dbc.deep_convert_object_ids(doc),
+                JOURNALS_RESP: doc,
             }
         except ValueError as e:
             return {'error': str(e)}, 404
