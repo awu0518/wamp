@@ -1105,7 +1105,9 @@ class StatesBulk(Resource):
 class Register(Resource):
     def post(self):
         try:
-            data = request.json
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return {"error": "Request body must be a JSON object"}, 400
 
             email = data.get("email")
             username = data.get("username")
@@ -1146,7 +1148,9 @@ class Register(Resource):
 class Login(Resource):
     def post(self):
         try:
-            data = request.json
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return {"error": "Request body must be a JSON object"}, 400
             email = data.get("email")
             password = data.get("password")
 

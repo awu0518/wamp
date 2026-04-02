@@ -169,6 +169,25 @@ def test_health_endpoint_has_db_status(client):
     assert 'ok' in data['db']
 
 
+def test_login_rejects_non_json_body(client):
+    """Login should fail with 400 when body is not JSON."""
+    resp = client.post('/login', data='not-json', content_type='text/plain')
+    data = resp.get_json()
+
+    assert resp.status_code == BAD_REQUEST
+    assert data['error'] == 'Request body must be a JSON object'
+
+
+def test_register_rejects_non_json_body(client):
+    """Register should fail with 400 when body is not JSON."""
+    resp = client.post('/register', data='not-json',
+                       content_type='text/plain')
+    data = resp.get_json()
+
+    assert resp.status_code == BAD_REQUEST
+    assert data['error'] == 'Request body must be a JSON object'
+
+
 def test_health_endpoint_has_collection_stats(client):
     """Test that health endpoint includes collection statistics."""
     resp = client.get(ep.HEALTH_EP)
