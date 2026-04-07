@@ -17,8 +17,10 @@ import cities.queries as cq
 import countries.queries as ctq
 import states.queries as stq
 import journals.queries as jq
+import logging
 
 # import werkzeug.exceptions as wz
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
@@ -61,6 +63,9 @@ JOURNALS_EP = '/journals'
 JOURNALS_RESP = 'journals'
 LEADERBOARD_EP = '/leaderboard'
 LEADERBOARD_RESP = 'rankings'
+DEV_LOGS_EP = '/developer/logs'
+DEV_LOGS_RESP = 'logs'
+
 
 # Swagger Models for Documentation
 city_model = api.model('City', {
@@ -192,6 +197,54 @@ class HelloWorld(Resource):
         Returns a simple 'hello world' message to confirm the API is accessible
         """
         return {HELLO_RESP: 'world'}
+
+
+@api.route(DEV_LOGS_EP)
+class DeveloperLogs(Resource):
+
+    @api.doc('developer_logs')
+    @api.doc(params={
+        'type': 'Log type: error, server, or access (default: error)',
+        'lines': 'Number of recent lines to return (default: 20)'
+    })
+    @api.response(200, 'Success')
+    @api.response(400, 'Invalid log type', error_response)
+    @api.response(500, 'Internal Server Error', error_response)
+    def get(self):
+        log_type = request.args.get('type', 'error')
+        num_lines = request.args.get('lines', 20, type=int)
+
+        log_map = {
+            'error': '/var/log/wamp-limjiannn.pythonanywhere.com.error.log',
+            'server': '/var/log/wamp-limjiannn.pythonanywhere.com.server.log',
+            'access': '/var/log/wamp-limjiannn.pythonanywhere.com.access.log',
+        }
+
+        log_file = log_map.get(log_type)
+        if not log_file:
+            return {
+                'error': "Invalid log type. Use error, server, or access."
+            }, 400
+
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                all_lines = f.readlines()
+
+            recent_lines = [
+                line.rstrip('\n') for line in all_lines[-num_lines:]
+                ]
+
+            return {
+                'message': f'Recent {log_type} log lines',
+                'log_file': log_file,
+                'shell_command': f'tail -n {num_lines} {log_file}',
+                DEV_LOGS_RESP: recent_lines,
+                'count': len(recent_lines)
+                }, 200
+
+        except Exception as e:
+            logger.exception('Developer logs endpoint failed')
+            return {'error': str(e)}, 500
 
 
 @api.route(ENDPOINT_EP)
