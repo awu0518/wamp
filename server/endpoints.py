@@ -4,7 +4,6 @@ The endpoint called `endpoints` will return all available endpoints.
 """
 # from http import HTTPStatus
 
-import logging
 from functools import wraps
 
 from flask import Flask, request
@@ -18,12 +17,8 @@ import cities.queries as cq
 import countries.queries as ctq
 import states.queries as stq
 import journals.queries as jq
-import logging
 
 # import werkzeug.exceptions as wz
-logger = logging.getLogger(__name__)
-
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
@@ -246,7 +241,7 @@ class DeveloperLogs(Resource):
                 }, 200
 
         except Exception as e:
-            logger.exception('Developer logs endpoint failed')
+            print('Developer logs endpoint failed:', e)
             return {'error': str(e)}, 500
 
 
@@ -1394,7 +1389,7 @@ class Leaderboard(Resource):
         try:
             return jq.get_leaderboard(), 200
         except Exception as e:
-            logger.exception("Leaderboard endpoint failed")
+            print("Leaderboard endpoint failed")
             return {'error': repr(e)}, 500
 
 
