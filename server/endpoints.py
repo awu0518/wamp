@@ -4,6 +4,7 @@ The endpoint called `endpoints` will return all available endpoints.
 """
 # from http import HTTPStatus
 
+import logging
 from functools import wraps
 
 from flask import Flask, request
@@ -22,6 +23,8 @@ import logging
 # import werkzeug.exceptions as wz
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 CORS(app)
 api = Api(
@@ -30,7 +33,7 @@ api = Api(
     title='Geographic Database API',
     description='A comprehensive REST API for managing geographic data '
                 'including countries, states, and cities',
-    doc='/',  # Swagger UI will be available at /docs/
+    doc='/',  # Swagger UI is served at the API root (/)
     contact_email='support@geodatabase.com',
     authorizations={
         'apikey': {
@@ -1158,7 +1161,9 @@ class StatesBulk(Resource):
 class Register(Resource):
     def post(self):
         try:
-            data = request.json
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return {"error": "Request body must be a JSON object"}, 400
 
             email = data.get("email")
             username = data.get("username")
@@ -1199,7 +1204,9 @@ class Register(Resource):
 class Login(Resource):
     def post(self):
         try:
-            data = request.json
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return {"error": "Request body must be a JSON object"}, 400
             email = data.get("email")
             password = data.get("password")
 
@@ -1387,7 +1394,7 @@ class Leaderboard(Resource):
         try:
             return jq.get_leaderboard(), 200
         except Exception as e:
-            print("LEADERBOARD ERROR:", repr(e))
+            logger.exception("Leaderboard endpoint failed")
             return {'error': repr(e)}, 500
 
 
