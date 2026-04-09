@@ -242,7 +242,7 @@ class DeveloperLogs(Resource):
                 }, 200
 
         except Exception as e:
-            logger.exception('Developer logs endpoint failed')
+            print('Developer logs endpoint failed:', e)
             return {'error': str(e)}, 500
 
 
