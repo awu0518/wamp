@@ -232,10 +232,10 @@ class Timestamp(Resource):
         Returns the current server time in both ISO format and Unix timestamp.
         Useful for synchronization and logging.
         """
-        current_time = datetime.now().isoformat()
+        now = datetime.now()
         return {
-            TIMESTAMP_RESP: current_time,
-            'unix': datetime.now().timestamp()
+            TIMESTAMP_RESP: now.isoformat(),
+            'unix': now.timestamp()
         }
 
 
