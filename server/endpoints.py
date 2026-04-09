@@ -167,9 +167,10 @@ def require_login(f):
     def decorated(self, *args, **kwargs):
         auth_header = request.headers.get('Authorization')
         payload = auth.verify_token_header(auth_header)
-        if not payload:
+        user_id = payload.get('user_id') if isinstance(payload, dict) else None
+        if not user_id:
             return {'error': 'Authentication required'}, 401
-        return f(self, *args, user_id=payload['user_id'], **kwargs)
+        return f(self, *args, user_id=user_id, **kwargs)
     return decorated
 
 

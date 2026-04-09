@@ -188,6 +188,19 @@ def test_register_rejects_non_json_body(client):
     assert data['error'] == 'Request body must be a JSON object'
 
 
+@patch('server.endpoints.auth.verify_token_header')
+def test_require_login_rejects_payload_without_user_id(
+        mock_verify_token_header, client):
+    """Auth decorator should return 401 when payload has no user_id."""
+    mock_verify_token_header.return_value = {}
+
+    resp = client.get('/journals', headers={'Authorization': 'Bearer test'})
+    data = resp.get_json()
+
+    assert resp.status_code == 401
+    assert data['error'] == 'Authentication required'
+
+
 def test_health_endpoint_has_collection_stats(client):
     """Test that health endpoint includes collection statistics."""
     resp = client.get(ep.HEALTH_EP)
