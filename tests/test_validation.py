@@ -17,6 +17,7 @@ from validation import (
     validate_type,
     validate_iso_code,
     validate_state_code,
+    validate_country_region_code,
     validate_no_extra_fields,
     normalize_upper_code,
     normalize_state_code,
@@ -314,6 +315,47 @@ class TestNormalizationHelpers:
         with pytest.raises(ValidationError) as exc:
             normalize_iso_code(123, 'iso_code')
         assert 'iso_code must be a string' in str(exc.value)
+
+
+class TestCountryRegionCode:
+    def test_us_region_code(self):
+        validate_country_region_code('NY', 'US')
+
+    def test_ca_region_code(self):
+        validate_country_region_code('ON', 'CA')
+
+    def test_au_region_code(self):
+        validate_country_region_code('NSW', 'AU')
+
+    def test_gb_region_code(self):
+        validate_country_region_code('SCT', 'GB')
+
+    def test_fallback_country_rule(self):
+        validate_country_region_code('IDF', 'FR')
+        validate_country_region_code('75', 'FR')
+
+    def test_country_code_is_normalized_for_rule_lookup(self):
+        validate_country_region_code('NY', ' us ')
+
+    def test_invalid_us_region_code(self):
+        with pytest.raises(ValidationError) as exc:
+            validate_country_region_code('CAL', 'US')
+        assert 'for country US' in str(exc.value)
+
+    def test_invalid_au_region_code(self):
+        with pytest.raises(ValidationError) as exc:
+            validate_country_region_code('XYZ', 'AU')
+        assert 'for country AU' in str(exc.value)
+
+    def test_invalid_type_region_code(self):
+        with pytest.raises(ValidationError) as exc:
+            validate_country_region_code(123, 'US')
+        assert 'region_code must be a string' in str(exc.value)
+
+    def test_invalid_type_country_code(self):
+        with pytest.raises(ValidationError) as exc:
+            validate_country_region_code('NY', 123)
+        assert 'country_iso_code must be a string' in str(exc.value)
 
 
 class TestNoExtraFields:

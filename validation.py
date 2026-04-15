@@ -311,6 +311,59 @@ def normalize_iso_code(value: Any, field_name: str = "iso_code") -> str:
     return normalize_upper_code(value, field_name)
 
 
+COUNTRY_REGION_CODE_RULES: dict[str, tuple[str, str]] = {
+    # US states and territories style codes.
+    'US': (r'^[A-Z]{2}$', 'exactly 2 uppercase letters'),
+    # Canadian provinces and territories style codes.
+    'CA': (r'^[A-Z]{2}$', 'exactly 2 uppercase letters'),
+    # Australia state/territory abbreviations.
+    'AU': (
+        r'^(NSW|VIC|QLD|WA|SA|TAS|NT|ACT)$',
+        'one of NSW, VIC, QLD, WA, SA, TAS, NT, ACT',
+    ),
+    # United Kingdom constituent country abbreviations.
+    'GB': (r'^(ENG|SCT|WLS|NIR)$', 'one of ENG, SCT, WLS, NIR'),
+}
+
+
+def validate_country_region_code(
+    value: str,
+    country_iso_code: str,
+    field_name: str = 'region_code',
+    country_field_name: str = 'country_iso_code',
+) -> None:
+    """
+    Validate a country-specific region code format.
+
+    Args:
+        value: Region code to validate.
+        country_iso_code: ISO country code used to select region rules.
+        field_name: Name of the region-code field.
+        country_field_name: Name of the country-code field.
+
+    Raises:
+        ValidationError: If value/country types are invalid or region format
+            does not match the country-specific rule.
+    """
+    if not isinstance(value, str):
+        raise ValidationError(f"{field_name} must be a string")
+    if not isinstance(country_iso_code, str):
+        raise ValidationError(f"{country_field_name} must be a string")
+
+    normalized_country = normalize_iso_code(country_iso_code, country_field_name)
+
+    # Default to a compact uppercase token when no explicit country rule exists.
+    pattern, description = COUNTRY_REGION_CODE_RULES.get(
+        normalized_country,
+        (r'^[A-Z0-9]{1,3}$', '1-3 uppercase letters or numbers'),
+    )
+
+    if not re.match(pattern, value):
+        raise ValidationError(
+            f"{field_name} must match {description} for country {normalized_country}"
+        )
+
+
 def validate_iso_code(value: str, field_name: str = "iso_code") -> None:
     """
     Validate ISO country code format (2-3 uppercase letters).
