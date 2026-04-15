@@ -130,14 +130,22 @@ def create(user_id: str, fields: dict) -> str:
             fields[BODY], 'body', min_length=0, max_length=5000)
 
     now = datetime.utcnow()
+    normalized_state_code = validation.normalize_state_code(
+        fields.get(STATE_CODE, ''),
+        STATE_CODE,
+    )
+    normalized_iso_code = validation.normalize_iso_code(
+        fields.get(ISO_CODE, ''),
+        ISO_CODE,
+    )
     doc = {
         USER_ID: user_id,
         TITLE: fields[TITLE].strip(),
         BODY: fields.get(BODY, ''),
         LOCATION_TYPE: fields[LOCATION_TYPE],
         LOCATION_NAME: fields[LOCATION_NAME].strip(),
-        STATE_CODE: fields.get(STATE_CODE, ''),
-        ISO_CODE: fields.get(ISO_CODE, ''),
+        STATE_CODE: normalized_state_code,
+        ISO_CODE: normalized_iso_code,
         LAT: fields.get(LAT),
         LNG: fields.get(LNG),
         VISITED_AT: fields.get(VISITED_AT, ''),

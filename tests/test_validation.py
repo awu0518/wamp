@@ -18,6 +18,9 @@ from validation import (
     validate_iso_code,
     validate_state_code,
     validate_no_extra_fields,
+    normalize_upper_code,
+    normalize_state_code,
+    normalize_iso_code,
 )
 
 
@@ -295,6 +298,22 @@ class TestStateCode:
         with pytest.raises(ValidationError) as exc:
             validate_state_code('N2', 'state_code')
         assert 'must be exactly 2 uppercase letters' in str(exc.value)
+
+
+class TestNormalizationHelpers:
+    def test_normalize_upper_code(self):
+        assert normalize_upper_code(' ny ', 'state_code') == 'NY'
+
+    def test_normalize_state_code_none(self):
+        assert normalize_state_code(None, 'state_code') == ''
+
+    def test_normalize_iso_code(self):
+        assert normalize_iso_code(' us ', 'iso_code') == 'US'
+
+    def test_normalize_raises_on_non_string(self):
+        with pytest.raises(ValidationError) as exc:
+            normalize_iso_code(123, 'iso_code')
+        assert 'iso_code must be a string' in str(exc.value)
 
 
 class TestNoExtraFields:

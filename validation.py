@@ -280,6 +280,37 @@ def validate_type(value: Any, field_name: str, expected_type: type) -> None:
         )
 
 
+def normalize_upper_code(value: Any, field_name: str) -> str:
+    """
+    Normalize a code-like string by trimming and uppercasing.
+
+    Args:
+        value: Value to normalize (None becomes empty string)
+        field_name: Name of the field for error messages
+
+    Returns:
+        Normalized string value.
+
+    Raises:
+        ValidationError: If value is not a string or None.
+    """
+    if value is None:
+        return ''
+    if not isinstance(value, str):
+        raise ValidationError(f"{field_name} must be a string")
+    return value.strip().upper()
+
+
+def normalize_state_code(value: Any, field_name: str = "state_code") -> str:
+    """Normalize state code by trimming and uppercasing."""
+    return normalize_upper_code(value, field_name)
+
+
+def normalize_iso_code(value: Any, field_name: str = "iso_code") -> str:
+    """Normalize ISO code by trimming and uppercasing."""
+    return normalize_upper_code(value, field_name)
+
+
 def validate_iso_code(value: str, field_name: str = "iso_code") -> None:
     """
     Validate ISO country code format (2-3 uppercase letters).
