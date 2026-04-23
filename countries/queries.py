@@ -153,10 +153,29 @@ def read_one(country_id: str) -> dict:
     Retrieve a single country by ID.
     Returns a copy of the country data.
     """
+    if not isinstance(country_id, str) or not country_id.strip():
+        raise ValueError('country_id must be a non-empty string')
+
     countries = read()
     if country_id not in countries:
         raise ValueError(f'No such country: {country_id}')
     return dict(countries[country_id])
+
+
+def read_one_by_iso_code(iso_code: str) -> dict:
+    """
+    Retrieve a single country by ISO code (case-insensitive).
+
+    Returns a copy of the first deterministic match.
+
+    Raises:
+        ValueError: If iso_code is invalid or no country is found.
+    """
+    matches = _find_iso_matches(iso_code)
+    if not matches:
+        normalized_iso = _normalize_iso_code(iso_code)
+        raise ValueError(f'No such country with iso_code: {normalized_iso}')
+    return dict(matches[0][1])
 
 
 def find_by_iso_code(iso_code: str) -> Optional[dict]:
@@ -166,10 +185,11 @@ def find_by_iso_code(iso_code: str) -> Optional[dict]:
     """
     if not isinstance(iso_code, str) or not iso_code.strip():
         return None
-    matches = _find_iso_matches(iso_code)
-    if matches:
-        return dict(matches[0][1])
-    return None
+
+    try:
+        return read_one_by_iso_code(iso_code)
+    except ValueError:
+        return None
 
 
 def create(flds: dict) -> str:
@@ -258,6 +278,9 @@ def increment_review_count(country_name: str, increment_by: int = 1) -> bool:
 
 
 def delete(country_id: str) -> bool:
+    if not isinstance(country_id, str) or not country_id.strip():
+        raise ValueError('country_id must be a non-empty string')
+
     countries = read()
     if country_id not in countries:
         raise ValueError(f'No such country: {country_id}')
@@ -279,9 +302,15 @@ def update(country_id: str, flds: dict) -> bool:
     Update an existing country with new field values.
     Returns True on success.
     """
+    if not isinstance(country_id, str) or not country_id.strip():
+        raise ValueError('country_id must be a non-empty string')
+
     # Validate input type
     if not isinstance(flds, dict):
         raise ValueError(f'Bad type for {type(flds)=}')
+
+    if not flds:
+        raise ValueError('No fields provided for update')
 
     # Validate no extra fields
     validation.validate_no_extra_fields(flds, [NAME, ISO_CODE])

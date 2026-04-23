@@ -84,6 +84,22 @@ def test_find_by_iso_code_none_on_blank(clear_country_cache):
     assert cq.find_by_iso_code("   ") is None
 
 
+def test_read_one_by_iso_code_success(temp_country):
+    found = cq.read_one_by_iso_code("fd")
+    assert found[cq.NAME] == "Freedonia"
+    assert found[cq.ISO_CODE] == "FD"
+
+
+def test_read_one_by_iso_code_raises_on_missing(clear_country_cache):
+    with pytest.raises(ValueError, match="No such country with iso_code"):
+        cq.read_one_by_iso_code("ZZ")
+
+
+def test_read_one_by_iso_code_raises_on_bad_type(clear_country_cache):
+    with pytest.raises(ValueError, match="iso_code must be a string"):
+        cq.read_one_by_iso_code(123)
+
+
 # WITH RAISES: invalid inputs
 def test_create_raises_on_bad_type(clear_country_cache):
     with pytest.raises(ValueError, match="Request body must be a JSON object"):
@@ -106,6 +122,11 @@ def test_read_one_raises_on_missing(clear_country_cache):
         cq.read_one("999")
 
 
+def test_read_one_raises_on_invalid_id(clear_country_cache):
+    with pytest.raises(ValueError, match="country_id must be a non-empty"):
+        cq.read_one("   ")
+
+
 def test_read_one_returns_copy(temp_country):
     # Verify that modifying the returned dict doesn't affect the cache
     country = cq.read_one(temp_country)
@@ -122,6 +143,11 @@ def test_delete_success(temp_country):
 def test_delete_raises_on_missing(clear_country_cache):
     with pytest.raises(ValueError, match="No such country"):
         cq.delete("999")
+
+
+def test_delete_raises_on_invalid_id(clear_country_cache):
+    with pytest.raises(ValueError, match="country_id must be a non-empty"):
+        cq.delete("")
 
 
 def test_update_country_success(temp_country):
@@ -153,6 +179,16 @@ def test_update_country_raises_on_missing(clear_country_cache):
 def test_update_country_raises_on_bad_type(temp_country):
     with pytest.raises(ValueError, match="Bad type"):
         cq.update(temp_country, ["not", "a", "dict"])
+
+
+def test_update_country_raises_on_invalid_id(clear_country_cache):
+    with pytest.raises(ValueError, match="country_id must be a non-empty"):
+        cq.update("", {cq.NAME: "Ghost Country"})
+
+
+def test_update_country_raises_on_empty_fields(temp_country):
+    with pytest.raises(ValueError, match="No fields provided for update"):
+        cq.update(temp_country, {})
 
 
 # PATCH: patch db_connect directly
