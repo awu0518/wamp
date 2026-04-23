@@ -59,12 +59,21 @@ LOGIN = 'login'
 
 # Features:
 PEOPLE = 'people'
+DEVELOPER_LOGS = 'developer_logs'
 
 security_recs = None
 # These will come from the DB soon:
 temp_recs = {
     PEOPLE: {
         CREATE: {
+            USER_LIST: ['ejc369@nyu.edu'],
+            CHECKS: {
+                LOGIN: True,
+            },
+        },
+    },
+    DEVELOPER_LOGS: {
+        READ: {
             USER_LIST: ['ejc369@nyu.edu'],
             CHECKS: {
                 LOGIN: True,
@@ -100,6 +109,14 @@ def read_feature(feature_name: str) -> dict:
         return security_recs[feature_name]
     else:
         return None
+
+
+@needs_recs
+def read_operation(feature: str, operation: str) -> dict:
+    feature_data = read_feature(feature)
+    if not feature_data:
+        return None
+    return feature_data.get(operation)
 
 
 @needs_recs

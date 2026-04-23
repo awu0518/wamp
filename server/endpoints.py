@@ -17,6 +17,7 @@ import cities.queries as cq
 import countries.queries as ctq
 import states.queries as stq
 import journals.queries as jq
+import security.security as sec
 
 # import werkzeug.exceptions as wz
 
@@ -174,6 +175,37 @@ def require_login(f):
     return decorated
 
 
+def require_security(feature: str, operation: str):
+    """Decorator that enforces security checks defined in security records."""
+    def outer(f):
+        @wraps(f)
+        def decorated(self, *args, **kwargs):
+            op_data = sec.read_operation(feature, operation)
+            if not op_data:
+                return f(self, *args, **kwargs)
+
+            auth_header = request.headers.get('Authorization')
+            payload = auth.verify_token_header(auth_header)
+
+            if sec.check_required(feature, operation, sec.LOGIN):
+                user_id = (
+                    payload.get('user_id') if isinstance(payload, dict)
+                    else None
+                )
+                if not user_id:
+                    return {'error': 'Authentication required'}, 401
+
+            user_email = (
+                payload.get('email') if isinstance(payload, dict) else ''
+            )
+            if not sec.has_permission(user_email, feature, operation):
+                return {'error': 'Forbidden'}, 403
+
+            return f(self, *args, **kwargs)
+        return decorated
+    return outer
+
+
 # Create namespaces for better organization
 geographic_ns = api.namespace('geographic',
                               description='Geographic data operations')
@@ -208,7 +240,10 @@ class DeveloperLogs(Resource):
     })
     @api.response(200, 'Success')
     @api.response(400, 'Invalid log type', error_response)
+    @api.response(401, 'Authentication required', error_response)
+    @api.response(403, 'Forbidden', error_response)
     @api.response(500, 'Internal Server Error', error_response)
+    @require_security(sec.DEVELOPER_LOGS, sec.READ)
     def get(self):
         log_type = request.args.get('type', 'error')
         num_lines = request.args.get('lines', 20, type=int)

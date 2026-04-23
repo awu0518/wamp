@@ -1,6 +1,7 @@
 from http.client import (
     BAD_REQUEST,
     FORBIDDEN,
+    UNAUTHORIZED,
     NOT_ACCEPTABLE,
     NOT_FOUND,
     OK,
@@ -199,6 +200,53 @@ def test_require_login_rejects_payload_without_user_id(
 
     assert resp.status_code == 401
     assert data['error'] == 'Authentication required'
+
+
+def test_developer_logs_requires_auth(client):
+    """Developer logs endpoint should require authentication."""
+    resp = client.get(ep.DEV_LOGS_EP)
+    data = resp.get_json()
+
+    assert resp.status_code == UNAUTHORIZED
+    assert data['error'] == 'Authentication required'
+
+
+@patch('server.endpoints.auth.verify_token_header')
+def test_developer_logs_forbidden_for_non_permitted_user(
+        mock_verify_token_header, client):
+    """Authenticated users not in the allowlist should get 403."""
+    mock_verify_token_header.return_value = {
+        'user_id': 'abc123',
+        'email': 'no-access@example.com',
+    }
+
+    resp = client.get(ep.DEV_LOGS_EP, headers={'Authorization': 'Bearer t'})
+    data = resp.get_json()
+
+    assert resp.status_code == FORBIDDEN
+    assert data['error'] == 'Forbidden'
+
+
+@patch('server.endpoints.open')
+@patch('server.endpoints.auth.verify_token_header')
+def test_developer_logs_allowed_for_permitted_user(
+        mock_verify_token_header, mock_open, client):
+    """Permitted users should be able to read developer logs."""
+    mock_verify_token_header.return_value = {
+        'user_id': 'abc123',
+        'email': 'ejc369@nyu.edu',
+    }
+    mock_open.return_value.__enter__.return_value.readlines.return_value = [
+        'line 1\n',
+        'line 2\n',
+    ]
+
+    resp = client.get(ep.DEV_LOGS_EP, headers={'Authorization': 'Bearer t'})
+    data = resp.get_json()
+
+    assert resp.status_code == OK
+    assert data['count'] == 2
+    assert ep.DEV_LOGS_RESP in data
 
 
 def test_health_endpoint_has_collection_stats(client):
