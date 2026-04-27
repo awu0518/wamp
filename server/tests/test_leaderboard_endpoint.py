@@ -1,7 +1,7 @@
 from http.client import OK, INTERNAL_SERVER_ERROR
 from unittest.mock import patch
 
-from endpoints import LEADERBOARD_EP
+from server.endpoints import LEADERBOARD_EP
 
 
 def test_get_leaderboard_success(client):
