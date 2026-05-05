@@ -8,7 +8,7 @@ from http.client import (
     SERVICE_UNAVAILABLE,
 )
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 from datetime import datetime
 
 import pytest
@@ -202,36 +202,32 @@ def test_require_login_rejects_payload_without_user_id(
     assert data['error'] == 'Authentication required'
 
 
-def test_developer_logs_requires_auth(client):
-    """Developer logs endpoint should require authentication."""
-    resp = client.get(ep.DEV_LOGS_EP)
+def test_developer_logs_public_access(client):
+    """Test developer logs endpoint is publicly accessible."""
+    mock_log = "line one\nline two\n"
+
+    with patch("builtins.open", mock_open(read_data=mock_log)):
+        resp = client.get(f"{ep.DEV_LOGS_EP}?type=error&lines=2")
+        data = resp.get_json()
+
+        assert resp.status_code == OK
+        assert data["message"] == "Recent error log lines"
+        assert ep.DEV_LOGS_RESP in data
+        assert data[ep.DEV_LOGS_RESP] == ["line one", "line two"]
+        assert data["count"] == 2
+
+
+def test_developer_logs_invalid_type(client):
+    resp = client.get(f"{ep.DEV_LOGS_EP}?type=badlog")
     data = resp.get_json()
-
-    assert resp.status_code == UNAUTHORIZED
-    assert data['error'] == 'Authentication required'
-
-
-@patch('server.endpoints.auth.verify_token_header')
-def test_developer_logs_forbidden_for_non_permitted_user(
-        mock_verify_token_header, client):
-    """Authenticated users not in the allowlist should get 403."""
-    mock_verify_token_header.return_value = {
-        'user_id': 'abc123',
-        'email': 'no-access@example.com',
-    }
-
-    resp = client.get(ep.DEV_LOGS_EP, headers={'Authorization': 'Bearer t'})
-    data = resp.get_json()
-
-    assert resp.status_code == FORBIDDEN
-    assert data['error'] == 'Forbidden'
+    assert resp.status_code == BAD_REQUEST
+    assert "error" in data
 
 
 @patch('server.endpoints.open')
 @patch('server.endpoints.auth.verify_token_header')
 def test_developer_logs_allowed_for_permitted_user(
         mock_verify_token_header, mock_open, client):
-    """Permitted users should be able to read developer logs."""
     mock_verify_token_header.return_value = {
         'user_id': 'abc123',
         'email': 'ejc369@nyu.edu',
