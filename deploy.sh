@@ -1,5 +1,6 @@
 #!/bin/bash
 # This shell script deploys a new version to a server.
+set -euo pipefail
 
 PROJ_DIR=bogosorters
 VENV=bogosorters
