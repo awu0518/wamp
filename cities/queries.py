@@ -352,6 +352,64 @@ def update(city_id: str, flds: dict) -> bool:
     return True
 
 
+def find_by_name_and_state_and_country(
+    city_name: str,
+    state_code: str = None,
+    country_iso_code: str = None,
+) -> dict:
+    """
+    Find a city by exact name, with optional state and/or country context.
+
+    Supports deterministic resolution for:
+    - State-aware countries (e.g., "Boston" + "MA" + "US")
+    - State-agnostic countries (e.g., "Berlin" + None + "DE")
+    - Same city name in different states/countries (disambiguated by context)
+
+    Args:
+        city_name: Exact city name to match (required)
+        state_code: Optional state code for disambiguation
+        country_iso_code: Optional country ISO code for disambiguation
+
+    Returns:
+        City data dict if exactly one match found, otherwise None
+    """
+    if not isinstance(city_name, str) or not city_name.strip():
+        return None
+
+    target_city_name = city_name.strip()
+    normalized_state_code = None
+    if state_code:
+        normalized_state_code = _normalize_state_code(state_code)
+
+    normalized_country_iso = None
+    if country_iso_code:
+        normalized_country_iso = _normalize_country_iso_code(country_iso_code)
+
+    cities = read()
+
+    for stored_name, city_data in cities.items():
+        # Exact name match
+        if stored_name != target_city_name:
+            continue
+
+        # If state_code provided, must match (case-insensitive)
+        if normalized_state_code:
+            stored_state = city_data.get(STATE_CODE, '').upper()
+            if stored_state != normalized_state_code:
+                continue
+
+        # If country_iso_code provided, must match (case-insensitive)
+        if normalized_country_iso:
+            stored_country = city_data.get(COUNTRY_ISO_CODE, '').upper()
+            if stored_country != normalized_country_iso:
+                continue
+
+        # Match found with all specified constraints
+        return dict(city_data)
+
+    return None
+
+
 def search(name: str = None,
            state_code: str = None,
            country_iso_code: str = None) -> dict:

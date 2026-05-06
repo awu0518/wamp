@@ -109,13 +109,55 @@ def read_one(state_id: str) -> dict:
     return dict(states[state_id])
 
 
-def find_by_state_code(state_code: str) -> Optional[dict]:
+def find_by_state_code_and_country_iso_code(
+    state_code: str,
+    country_iso_code: str,
+) -> Optional[dict]:
     """
-    Find a state by its state code (case-insensitive).
+    Find a state by state code and country ISO code (case-insensitive).
     Returns a copy of the state data if found, otherwise None.
     """
-    if not isinstance(state_code, str) or not state_code:
+    if not isinstance(state_code, str) or not state_code.strip():
         return None
+    if not isinstance(country_iso_code, str) or not country_iso_code.strip():
+        return None
+
+    target_state_code = state_code.strip().upper()
+    target_country_iso_code = country_iso_code.strip().upper()
+    states = read()
+
+    for rec in states.values():
+        code = rec.get(STATE_CODE)
+        country_code = rec.get(COUNTRY_ISO_CODE)
+        if (
+            isinstance(code, str)
+            and isinstance(country_code, str)
+            and code.upper() == target_state_code
+            and country_code.upper() == target_country_iso_code
+        ):
+            return dict(rec)
+    return None
+
+
+def find_by_state_code(
+    state_code: str,
+    country_iso_code: str = None,
+) -> Optional[dict]:
+    """
+    Find a state by its state code (case-insensitive).
+
+    If country_iso_code is provided, the lookup is restricted to that country
+    to avoid ambiguous matches across countries.
+    """
+    if country_iso_code:
+        return find_by_state_code_and_country_iso_code(
+            state_code,
+            country_iso_code,
+        )
+
+    if not isinstance(state_code, str) or not state_code.strip():
+        return None
+
     target = state_code.strip().upper()
     states = read()
     for rec in states.values():

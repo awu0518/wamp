@@ -219,6 +219,38 @@ def test_find_by_state_code_not_found():
     assert state is None
 
 
+def test_find_by_state_code_with_country_iso_code():
+    """Test find_by_state_code disambiguates by country when provided"""
+    timestamp = int(time.time())
+    us_state = {
+        sq.NAME: f"SharedCodeUS_{timestamp}",
+        sq.STATE_CODE: "SC",
+        sq.COUNTRY_ISO_CODE: "US",
+    }
+    ca_state = {
+        sq.NAME: f"SharedCodeCA_{timestamp}",
+        sq.STATE_CODE: "SC",
+        sq.COUNTRY_ISO_CODE: "CA",
+    }
+
+    sq.create(us_state)
+    sq.create(ca_state)
+
+    try:
+        us_match = sq.find_by_state_code("sc", "us")
+        ca_match = sq.find_by_state_code("SC", "CA")
+
+        assert us_match is not None
+        assert ca_match is not None
+        assert us_match[sq.NAME] == us_state[sq.NAME]
+        assert ca_match[sq.NAME] == ca_state[sq.NAME]
+        assert us_match[sq.COUNTRY_ISO_CODE] == "US"
+        assert ca_match[sq.COUNTRY_ISO_CODE] == "CA"
+    finally:
+        sq.delete(us_state[sq.NAME])
+        sq.delete(ca_state[sq.NAME])
+
+
 def test_search_by_name(temp_state):
     """Test search function with name parameter"""
     results = sq.search(name="Test")
